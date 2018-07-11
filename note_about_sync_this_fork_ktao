@@ -1,0 +1,6 @@
+# to sync with upstream repo:
+git checkout master
+git pull
+git fetch upstream
+git merge upstream/master 
+git push

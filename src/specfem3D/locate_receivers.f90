@@ -159,7 +159,10 @@
     if (ier /= 0) call exit_mpi(myrank,'error opening file '//trim(rec_filename))
     ! reads all stations
     do irec = 1,nrec
-      read(IIN,*,iostat=ier) station_name(irec),network_name(irec),stlat(irec),stlon(irec),stele(irec),stbur(irec)
+      !! ktao ktao change the order between station_name and network_name
+      !!           to confine to "net.sta" naming rule.
+      !!read(IIN,*,iostat=ier) station_name(irec),network_name(irec),stlat(irec),stlon(irec),stele(irec),stbur(irec)
+      read(IIN,*,iostat=ier) network_name(irec),station_name(irec),stlat(irec),stlon(irec),stele(irec),stbur(irec)
       if (ier /= 0) call exit_mpi(myrank, 'Error reading station file '//trim(rec_filename))
     enddo
     ! close receiver file

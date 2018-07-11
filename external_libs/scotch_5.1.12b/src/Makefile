@@ -43,7 +43,8 @@ required			:	Makefile.inc	../bin	../include	../lib
 
 include Makefile.inc
 
-prefix		?= /usr/local
+#prefix		?= /usr/local
+prefix		?= /home1/tao/EastTibet_NoiseCC_FWI/specfem3d_code/external_libs/scotch
 bindir		?= $(prefix)/bin
 includedir	?= $(prefix)/include
 libdir		?= $(prefix)/lib
