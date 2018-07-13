@@ -91,7 +91,8 @@
     enddo
 
     ! read header with event information
-    read(string,"(a6,i4)") dummy,dummyval
+    ! KT KT Skip reading the first line since it is not used in the code
+    !read(string,"(a6,i4)") dummy,dummyval
 
     ! read time shift
     read(IIN,"(a)") string

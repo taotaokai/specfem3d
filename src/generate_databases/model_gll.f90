@@ -35,7 +35,9 @@
 !
 !--------------------------------------------------------------------------------------------------
 
-  subroutine model_gll(myrank,nspec,LOCAL_PATH)
+  ! KT KT use ./DATA/GLL as the default directory for gll model files  
+  !subroutine model_gll(myrank,nspec,LOCAL_PATH)
+  subroutine model_gll(myrank,nspec)
 
   use generate_databases_par, only: NGLLX,NGLLY,NGLLZ,FOUR_THIRDS,IMAIN,MAX_STRING_LEN,ATTENUATION
 
@@ -44,7 +46,8 @@
   implicit none
 
   integer, intent(in) :: myrank,nspec
-  character(len=MAX_STRING_LEN) :: LOCAL_PATH
+  ! KT KT fix the path 
+  character(len=MAX_STRING_LEN) :: LOCAL_PATH = './DATA/GLL'
 
   ! local parameters
   real, dimension(:,:,:,:),allocatable :: vp_read,vs_read,rho_read

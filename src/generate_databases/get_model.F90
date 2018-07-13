@@ -706,7 +706,9 @@
     if (ADIOS_FOR_MESH) then
       call model_gll_adios(myrank,nspec,LOCAL_PATH)
     else
-      call model_gll(myrank,nspec,LOCAL_PATH)
+      ! KT KT remove the argument LOCAL_PATH
+      !call model_gll(myrank,nspec,LOCAL_PATH)
+      call model_gll(myrank,nspec)
     endif
 
   case (IMODEL_IPATI)

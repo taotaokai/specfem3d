@@ -1,0 +1,45 @@
+# Some subroutines are tweaked/added to suit my needs.
+
+#====== Skip reading the first line in FORCESOLUTION
+
+src/specfem3D/get_force.f90 
+  - comment out parsing the first line of FORCESOLUTION, as I change it to "event_ID   ref_time"
+  - line:94-95 !read(string,"(a6,i4)") dummy,dummyval
+    
+#====== Swap the order in reading stnm and netwk in STATIONS file  
+
+src/specfem3D/locate_receivers.f90 
+  - line 162-165: change the order between station_name and network_name 
+
+#====== Fix the GLL model path to "DATA/GLL"
+
+src/generate_databases/model_gll.f90
+  - line:38-40,49-50 fix LOCAL_PATH = "DATA/GLL"
+
+src/generate_databases/get_model.F90 
+  - line:709-711 remove the argument LOCAL_PATH
+
+#====== Add the option to read in anisotropic model in GLL format 
+
+src/generate_databases/model_gll_aniso.f90 
+  - add this new subroutine to read in anisotropic model
+
+src/generate_databases/get_model.F90 
+  - add entries for IMODEL_GLL_ANISO at lines:484, 653, 688,722, 
+
+src/generate_databases/model_gll.f90 
+  - hardwire gll path to DATA/GLL at line 49
+
+src/generate_databases/read_parameters.f90 
+  - add entry for IMODEL_GLL_ANISO at line 96
+
+src/generate_databases/rules.mk 
+  - add entry for $O/model_gll_aniso.gen.o
+
+src/shared/read_parameter_file.F90 
+  - add entry for gll_aniso at line 870
+
+src/specfem3D/initialize_simulation.F90 
+  - add entry for gll_aniso at line 101
+
+#====== [OBSOLETE] src/specfem3D/setup_sources_receivers.f90 - correct computation on force source_array at lines 675-726. This bug is already fixed in the CIG repo as of 2018-07-10.
