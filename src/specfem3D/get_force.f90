@@ -52,10 +52,10 @@
   real(kind=CUSTOM_REAL), dimension(NSTEP_STF, NSOURCES_STF), intent(out) :: user_source_time_function
 
   ! local variables below
-  integer :: isource,dummyval
+  integer :: isource !,dummyval ! KT KT comment out dummyval since this is not used anywhere in the code
   double precision :: t_shift(NSOURCES)
   double precision :: length
-  character(len=7) :: dummy
+  !character(len=7) :: dummy ! KT KT comment out since this is not used anywhere in the code
   character(len=MAX_STRING_LEN) :: string
   character(len=MAX_STRING_LEN) :: external_source_time_function_filename
   integer :: ier

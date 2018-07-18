@@ -1,0 +1,3 @@
+gmt grdcut etopo2.grd -GETibet.grd -R80/120/10/50
+gmt grdfilter ETibet.grd -D4 -Fc60 -GETibet_smooth.grd
+gmt grd2xyz ETibet_smooth.grd > ETibet_smooth.txt

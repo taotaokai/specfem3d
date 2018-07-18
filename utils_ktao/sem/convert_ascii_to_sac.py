@@ -25,8 +25,9 @@ out_dir = str(sys.argv[3])
 with open(station_file, 'r') as f:
   lines = [ x.split() for x in f.readlines() if not(x.startswith('#')) ]
 
-stnm = [x[0] for x in lines]
-netwk = [x[1] for x in lines]
+netwk = [x[0] for x in lines]
+stnm = [x[1] for x in lines]
+
 
 #====== read in ascii files
 nstn = len(stnm)
