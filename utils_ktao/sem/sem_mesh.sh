@@ -43,17 +43,23 @@ sem_dir=$(readlink -f $sem_dir)
 
 #====== setup run_dir
 cd $run_dir
-mkdir DATA DATABASES_MPI OUTPUT_FILES
+mkdir -p DATA DATA/meshfem3D_files DATABASES_MPI OUTPUT_FILES
 
 cd $run_dir/DATA
+cp -a $par_dir/Par_file .
+cp -a $par_dir/CMTSOLUTION .
+cp -a $par_dir/FORCESOLUTION .
+cp -a $par_dir/STATIONS .
 
-cp -rL $par_dir/* .
+cd $run_dir/DATA/meshfem3D_files
+cp -a $par_dir/meshfem3D_files/*.dat .
+cp -a $par_dir/meshfem3D_files/Mesh_Par_file .
 
 #sed -i "/^[\s]*SAVE_MESH_FILES/s/=.*/= .false./" Par_file
 #sed -i "/^[\s]*MODEL/s/=.*/= GLL/" Par_file
 
 # backup Par_file into OUTPUT_FILES/
-cp -L Par_file CMTSOLUTION FORCESOLUTION $run_dir/OUTPUT_FILES/
+cp -a $run_dir/DATA/Par_file $run_dir/OUTPUT_FILES/
 
 # generate sbatch job file
 nproc=$(grep ^NPROC $par_dir/Par_file | awk '{print $NF}')

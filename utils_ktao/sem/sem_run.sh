@@ -60,7 +60,7 @@ cp -L $par_dir/*SOLUTION .
 cp -L $par_dir/STATIONS .
 
 # check DT: time step
-DT=$(grep "Maximum suggested time step" $mesh_dir/OUTPUT_FILES/output_meshfem3D.txt |\
+DT=$(grep "Maximum suggested time step" $mesh_dir/OUTPUT_FILES/output_generate_databases.txt |\
  sed "s/.*=//" | awk '{printf "%f",$1}')
 
 echo
@@ -77,6 +77,11 @@ cp -L Par_file CMTSOLUTION FORCESOLUTION STATIONS $run_dir/OUTPUT_FILES/
 # link mesh database
 cd $run_dir/DATABASES_MPI
 ln -s $mesh_dir/DATABASES_MPI/proc*_external_mesh.bin .
+if [ -f $mesh_dir/DATABASES_MPI/proc000000_attenuation.bin ]
+then
+  ln -s $mesh_dir/DATABASES_MPI/proc*_attenuation.bin .
+fi
+
 #ln -s $mesh_dir/DATABASES_MPI/proc*_Database .
 
 # OUTPUT_FILES
