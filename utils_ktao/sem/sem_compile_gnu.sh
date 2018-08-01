@@ -80,8 +80,8 @@ cd $sem_build_dir
 #./configure FC=gfortran MPIFC=mpif90 CC=gcc 
 
 make clean
-make xdecompose_mesh xmeshfem3D xgenerate_databases xspecfem3D xcombine_vol_data_vtk \
+#make xdecompose_mesh xmeshfem3D xgenerate_databases xspecfem3D xcombine_vol_data_vtk \
   > >(tee make.out) 2> >(tee make.err >&2)
-#make  > >(tee make.out) 2> >(tee make.err >&2)
+make all  > >(tee make.out) 2> >(tee make.err >&2)
 
 #END

@@ -24,16 +24,13 @@ then
     exit 1
 elif [ ! -f "$par_dir/Par_file" ]
 then
-    echo "[ERROR] $par_dir/Par_file does NOT exist!"
-    exit 1
+    echo "[WARN] $par_dir/Par_file does NOT exist!"
 elif [ ! -f "$par_dir/CMTSOLUTION" ] && [ ! -f "$par_dir/FORCESOLUTION" ]
 then
-    echo "[ERROR] $par_dir/CMTSOLUTION does NOT exist!"
-    exit 1
+    echo "[WARN] $par_dir/CMTSOLUTION does NOT exist!"
 elif [ ! -f "$par_dir/STATIONS" ]
 then
-    echo "[ERROR] $par_dir/STATIONS does NOT exist!"
-    exit 1
+    echo "[WARN] $par_dir/STATIONS does NOT exist!"
 fi
 
 if [ ! -d "$mesh_dir" ]
