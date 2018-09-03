@@ -12,6 +12,8 @@ import numpy as np
 from scipy.io import FortranFile
 from scipy import spatial
 
+from mpi4py import MPI
+
 import pyproj
 import importlib
 
@@ -29,14 +31,14 @@ nproc = int(sys.argv[2])
 mesh_dir = str(sys.argv[3]) # <mesh_dir>/proc******_external_mesh.bin
 model_dir = str(sys.argv[4]) # <model_dir>/proc******_<model_name>.bin
 model_names = str(sys.argv[5]) # comma delimited e.g. vp,vs,rho,qmu,qkappa
-out_dir = str(sys.argv[6])
+sigma_h = float(sys.argv[6]) # e.g. 10000 meters, horizontal smoothing length
+sigma_r = float(sys.argv[7]) # e.g. 5000 meters, radial smoothing length
+out_dir = str(sys.argv[8])
 
-sigma_h = 10000 # horizontal meters
-sigma_r = 5000 # radial meters
-
+#--- Gaussian smoothing kernel 
 sigma2_h = sigma_h**2
 sigma2_r = sigma_r**2
-search_radius = 3.0*max(sigma_h, sigma_r)
+search_radius = 3.0*max(sigma_h, sigma_r) # search neighboring points
 
 #--- model names
 model_names = model_names.split(',')
@@ -68,7 +70,11 @@ xyz_ref = np.zeros(3)
 xyz_ref[0], xyz_ref[1], xyz_ref[2] = pyproj.transform(lla, ecef, ref_lon, ref_lat, ref_alt)
 
 #====== smooth each target mesh slice
-for iproc_target in range(nproc):
+comm = MPI.COMM_WORLD
+mpi_size = comm.Get_size()
+mpi_rank = comm.Get_rank()
+
+for iproc_target in range(mpi_rank,nproc,mpi_size):
 
   print("====== target proc# ", iproc_target)
 
@@ -89,6 +95,8 @@ for iproc_target in range(nproc):
   for iproc_contrib in range(nproc):
 
     print("--- contrib proc# ", iproc_contrib)
+    sys.stdout.flush()
+    #start = time.clock()
 
     #--- read in contributing SEM mesh
     mesh_file = "%s/proc%06d_external_mesh.bin"%(mesh_dir, iproc_contrib)
@@ -102,15 +110,22 @@ for iproc_target in range(nproc):
 
     vol_gll_contrib = sem_mesh_get_vol_gll(mesh_contrib)
 
-    #--- skip mesh slice that is too faraway from the target mesh slice
-    min_dist = np.min(np.sum((xyz_elem_contrib.reshape((3,1,nspec_contrib)) - xyz_elem_target.reshape((3,nspec_target,1)))**2, axis=0)**0.5)
-    #print("min_dist: ", min_dist)
-    if min_dist > search_radius:
-      print("... too faraway, skip")
+    #--- get neighboring contrib elements
+    points_target = np.c_[xyz_elem_target[0,:].ravel(), xyz_elem_target[1,:].ravel(), xyz_elem_target[2,:].ravel()]
+    tree_target = spatial.cKDTree(points_target)
+
+    points_contrib = np.c_[xyz_elem_contrib[0,:].ravel(), xyz_elem_contrib[1,:].ravel(), xyz_elem_contrib[2,:].ravel()]
+    tree_contrib = spatial.cKDTree(points_contrib)
+
+    neighbor_lists = tree_target.query_ball_tree(tree_contrib, search_radius)
+
+    #skip mesh slice that is too faraway from the target mesh slice
+    if not any(neighbor_lists[:]):
+      #print("... too faraway, skip this mesh slice")
       continue
 
     #--- read model values of the contributing mesh slice
-    print("... read model")
+    #print("... read model")
     model_gll_contrib = np.zeros((nmodel,)+gll_dims_contrib)
     for imodel in range(nmodel):
       model_tag = model_names[imodel]
@@ -120,29 +135,29 @@ for iproc_target in range(nproc):
                                                        gll_dims_contrib)
 
     #--- gather contributions for each target gll point
-    points_contrib = np.c_[xyz_elem_contrib[0,:].ravel(), xyz_elem_contrib[1,:].ravel(), xyz_elem_contrib[2,:].ravel()]
-    tree = spatial.cKDTree(points_contrib)
-
     #print("nspec_target(%d):            "%(nspec_target) )
-    sys.stdout.write("nspec_target(%d):            "%(nspec_target))
-    sys.stdout.flush()
+    #sys.stdout.write("nspec_target(%d):            "%(nspec_target))
+    #sys.stdout.flush()
 
-    for ispec_target in range(nspec_target):
+    ispec_target_list = [ ispec for ispec in range(nspec_target) if neighbor_lists[ispec] ]
+    #for ispec_target in range(nspec_target):
+    for ispec_target in ispec_target_list:
 
       #print("\b\b\b\b\b\b\b\b\b%09d"%(ispec_target), end="")
-      sys.stdout.write("\b\b\b\b\b\b\b\b\b%09d"%(ispec_target))
-      sys.stdout.flush()
+      #sys.stdout.write("\b\b\b\b\b\b\b\b\b%09d"%(ispec_target))
+      #print("... ispec_target: ", ispec_target)
+      #sys.stdout.flush()
 
       iglob_target = mesh_target['ibool'][:,:,:,ispec_target].ravel() - 1
       ngll_target = len(iglob_target)
-      xyz_gll_target = xyz_glob_target[:,iglob_target] #.reshape((3,-1))
+      xyz_gll_target = xyz_glob_target[:,iglob_target]
 
-      ielem_contrib = tree.query_ball_point(xyz_elem_target[:,ispec_target], search_radius)
-      #print("  nelem_contrib: ", len(ielem_contrib))
+      ielem_contrib = neighbor_lists[ispec_target]
+      #print("nelem_contrib: ", len(ielem_contrib))
 
       iglob_contrib = mesh_contrib['ibool'][:,:,:,ielem_contrib].ravel() - 1
       ngll_contrib = len(iglob_contrib)
-      xyz_gll_contrib = xyz_glob_contrib[:,iglob_contrib] #.reshape((3,-1))
+      xyz_gll_contrib = xyz_glob_contrib[:,iglob_contrib]
 
       #DEBUG
       #max_dist = np.max(np.sum((xyz_gll_contrib - xyz_elem_target[:,ispec_target].reshape((3,1)))**2,axis=0)**0.5)
@@ -154,6 +169,8 @@ for iproc_target in range(nproc):
       vol_gll = vol_gll_contrib[:,:,:,ielem_contrib].ravel()
 
       #print(ngll_target, ngll_contrib)
+      weight_model_val = np.empty((nmodel,NGLLX,NGLLY,NGLLZ))
+      weight_val = np.empty((NGLLX,NGLLY,NGLLZ))
       weight_model_val, weight_val = smooth_gauss_cap(xyz_gll_target, xyz_gll_contrib, 
                                                       model_gll, vol_gll, 
                                                       sigma2_h, sigma2_r)
@@ -179,15 +196,18 @@ for iproc_target in range(nproc):
       #weight_gll_target[:,:,:,ispec_target] += np.sum(weight,axis=1).reshape((NGLLX,NGLLY,NGLLZ))
 
     #END--- gather contributions for each target gll point  
-    print("")
+    #print("")
+    #print("time used(sec): ", time.clock() - start)
 
   #END====== loop over each contributing mesh slice
-  
+
+  #--- weighted average model values on each target gll point
+  weight_model_gll_target /= weight_gll_target
+ 
   #--- output model gll file
   for imodel in range(nmodel):
     model_tag = model_names[imodel]
-    out_file = "%s/proc%06d_%s.bin"%(out_dir, iproc, model_tag)
+    out_file = "%s/proc%06d_%s.bin"%(out_dir, iproc_target, model_tag)
     with FortranFile(out_file, 'w') as f:
-      #--- weighted average values on each target mesh slice
-      out_data = np.ravel(model_gll_target[imodel,:,:,:,:]/weight_gll_target)
+      out_data = np.ravel(weight_model_gll_target[imodel,:], order='F') # Fortran column-major
       f.write_record(np.array(out_data, dtype='f4'))
