@@ -68,6 +68,7 @@
 
   ! density
   allocate(rho_read(NGLLX,NGLLY,NGLLZ,nspec),stat=ier)
+  if (ier /= 0) call exit_MPI_without_rank('error allocating array 647')
   if (ier /= 0) stop 'error allocating array rho_read'
 
   ! user output
@@ -85,6 +86,7 @@
 
   ! vp
   allocate(vp_read(NGLLX,NGLLY,NGLLZ,nspec),stat=ier)
+  if (ier /= 0) call exit_MPI_without_rank('error allocating array 648')
   if (ier /= 0) stop 'error allocating array vp_read'
 
   ! user output
@@ -102,6 +104,7 @@
 
   ! vs
   allocate(vs_read(NGLLX,NGLLY,NGLLZ,nspec),stat=ier)
+  if (ier /= 0) call exit_MPI_without_rank('error allocating array 649')
   if (ier /= 0) stop 'error allocating array vs_read'
 
   ! user output
