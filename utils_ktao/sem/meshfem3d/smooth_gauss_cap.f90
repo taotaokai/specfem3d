@@ -44,7 +44,7 @@ do igll_target = 1, ngll_target
     if (iprod >1) then 
       iprod = 1.0
     endif
-    dist2_theta = acos(iprod)
+    dist2_theta = acos(iprod)**2
 
     weight = exp(-0.5*dist2_radial/sigma2_r) * exp(-0.5*dist2_theta/sigma2_theta) * vol_gll_contrib(igll_contrib)
 

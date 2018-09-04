@@ -31,8 +31,8 @@ nproc = int(sys.argv[2])
 mesh_dir = str(sys.argv[3]) # <mesh_dir>/proc******_external_mesh.bin
 model_dir = str(sys.argv[4]) # <model_dir>/proc******_<model_name>.bin
 model_names = str(sys.argv[5]) # comma delimited e.g. vp,vs,rho,qmu,qkappa
-sigma_h = float(sys.argv[6]) # e.g. 10000 meters, horizontal smoothing length
-sigma_r = float(sys.argv[7]) # e.g. 5000 meters, radial smoothing length
+sigma_h = float(sys.argv[6]) # e.g. 2000 meters, horizontal smoothing length
+sigma_r = float(sys.argv[7]) # e.g. 2000 meters, radial smoothing length
 out_dir = str(sys.argv[8])
 
 #--- Gaussian smoothing kernel 
@@ -77,6 +77,7 @@ mpi_rank = comm.Get_rank()
 for iproc_target in range(mpi_rank,nproc,mpi_size):
 
   print("====== target proc# ", iproc_target)
+  sys.stdout.flush()
 
   #--- read in target SEM mesh
   mesh_file = "%s/proc%06d_external_mesh.bin"%(mesh_dir, iproc_target)
@@ -131,8 +132,9 @@ for iproc_target in range(mpi_rank,nproc,mpi_size):
       model_tag = model_names[imodel]
       model_file = "%s/proc%06d_%s.bin"%(model_dir, iproc_contrib, model_tag)
       with FortranFile(model_file, 'r') as f:
+        # note: must use fortran convention when reshape to N-D array!!! 
         model_gll_contrib[imodel,:,:,:,:] = np.reshape(f.read_ints(dtype='f4'), 
-                                                       gll_dims_contrib)
+                                                       gll_dims_contrib, order='F')
 
     #--- gather contributions for each target gll point
     #print("nspec_target(%d):            "%(nspec_target) )
@@ -189,9 +191,9 @@ for iproc_target in range(mpi_rank,nproc,mpi_size):
       #xyz_gll_contrib /= r_gll_contrib
       #iprod = np.sum(xyz_gll_contrib.reshape((3,1,ngll_contrib)) * xyz_gll_target.reshape((3,ngll_target,1)), axis=0)
       #iprod[iprod>1] = 1.0
-      #dist2_theta = np.arccos(iprod)
+      #dist2_theta = np.arccos(iprod)**2
       #weight = np.exp(-0.5*dist2_radial/sigma2_r) * np.exp(-0.5*dist2_theta/sigma2_theta) * vol_gll.reshape((1,ngll_contrib))
-      #tmp = np.sum(weight*model_gll.reshape((nmodel,1,ngll_contrib)), axis=2)
+      #tmp = np.sum(weight.reshape((1,ngll_target,ngll_contrib))*model_gll.reshape((nmodel,1,ngll_contrib)), axis=2)
       #model_gll_target[:,:,:,:,ispec_target] += tmp.reshape((nmodel,NGLLX,NGLLY,NGLLZ))
       #weight_gll_target[:,:,:,ispec_target] += np.sum(weight,axis=1).reshape((NGLLX,NGLLY,NGLLZ))
 
