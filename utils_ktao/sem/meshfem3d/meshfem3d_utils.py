@@ -49,7 +49,7 @@ def rotmat_enu_to_ecef(lon,lat):
   """ rotation matrix from local ENU (lon,lat,alt) to ECEF coordinate basises
   rotmat[:,0] = Ve # column vector is the Easting direction in ECEF coordinate
   rotmat[:,1] = Vn
-  rotmat[:,1] = Vu
+  rotmat[:,2] = Vu
   
   xyz_ecef = xyz0_ecef + rotmat * enu
   enu = transpose(rotmat) * (xyz_ecef - xyz0_ecef)

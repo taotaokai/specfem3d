@@ -1,0 +1,31 @@
+#!/bin/bash
+#SBATCH -J smooth
+#SBATCH -o smooth.job.o%j
+#SBATCH -n 250
+#SBATCH -p compute
+
+# mpirun -np NPROC bin/xsmooth_sem SIGMA_H SIGMA_V KERNEL_NAME INPUT_DIR OUPUT_DIR GPU_MODE
+echo
+echo Job started on $(date)
+echo
+
+mkdir model_smooth_test
+
+nproc=250
+model_name=vp,vs,rho,qmu,qkappa
+sigma_h=2000
+sigma_v=2000
+
+#mpirun ./test_sem_smooth.py mesh_par.py ${nproc} DATABASES_MPI/ DATABASES_MPI/ vs ${sigma_h} ${sigma_v} model_smooth_test/
+
+mpirun -np 250 ./sem_smooth.py mesh_par.py ${nproc} DATABASES_MPI/ DATABASES_MPI/ ${model_name} ${sigma_h} ${sigma_v} model_smooth/
+
+#mpirun -np 250 /data1/tao/EastTibet_NoiseCC_FWI/specfem3d/bin/xsmooth_sem ${sigma_h} ${sigma_v} vp,vs,rho,qmu,qkappa DATABASES_MPI model_smooth false
+#mpirun -np 250 /data1/tao/EastTibet_NoiseCC_FWI/specfem3d/bin/xsmooth_sem 20 5 vs DATABASES_MPI model_smooth 0
+#mpirun -np 250 /data1/tao/EastTibet_NoiseCC_FWI/specfem3d/bin/xsmooth_sem 20 5 rho DATABASES_MPI model_smooth 0
+#mpirun -np 250 /data1/tao/EastTibet_NoiseCC_FWI/specfem3d/bin/xsmooth_sem 20 5 qmu DATABASES_MPI model_smooth 0
+#mpirun -np 250 /data1/tao/EastTibet_NoiseCC_FWI/specfem3d/bin/xsmooth_sem 20 5 qkappa DATABASES_MPI model_smooth 0
+
+echo
+echo Job finished on $(date)
+echo
