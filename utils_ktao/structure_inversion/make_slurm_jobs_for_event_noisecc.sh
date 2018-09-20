@@ -85,12 +85,12 @@ mkdir -p $event_dir/DATA
 cd $event_dir/DATA
 
 # convert STATION to REF_ENU
-$sem_utils_dir/sem/meshfem3d/convert_STATIONS_in_REF_ENU.py $sem_config_dir/meshfem3D_files/mesh_par.py  $sem_config_dir/meshfem3D_files/topo.grd STATIONS.lla tmp
+$sem_utils_dir/sem/meshfem3d/convert_STATIONS_from_geodesic_to_REF_ENU.py $sem_config_dir/meshfem3D_files/mesh_par.py  $sem_config_dir/meshfem3D_files/topo.grd STATIONS.lla tmp
 grep -v nan tmp > STATIONS
 rm tmp
 
 # convert FORCESOLUTION to REF_ENU
-$sem_utils_dir/sem/meshfem3d/convert_FORCESOLUTION_in_REF_ENU.py $sem_config_dir/meshfem3D_files/mesh_par.py  $sem_config_dir/meshfem3D_files/topo.grd FORCESOLUTION.lla FORCESOLUTION
+$sem_utils_dir/sem/meshfem3d/convert_FORCESOLUTION_from_geodesic_to_REF_ENU.py $sem_config_dir/meshfem3D_files/mesh_par.py  $sem_config_dir/meshfem3D_files/topo.grd FORCESOLUTION.lla FORCESOLUTION
 
 cp $mesh_dir/DATA/Par_file .
 sed -i "/^SIMULATION_TYPE/s/=.*/= 1/" Par_file
@@ -119,12 +119,12 @@ mkdir $event_dir/\$out_dir/seis
 mv $event_dir/\$out_dir/*.sem? $event_dir/\$out_dir/seis
 
 mkdir $event_dir/\$out_dir/sac
-$sem_utils_dir/sem/meshfem3d/convert_ascii_to_sac_in_local_ENZ.py $sem_config_dir/meshfem3D_files/mesh_par.py  $event_dir/DATA/FORCESOLUTION.lla $event_dir/DATA/STATIONS.lla $sem_band_code $event_dir/\$out_dir/seis $event_dir/\$out_dir/sac
+$sem_utils_dir/sem/meshfem3d/convert_ascii_in_REF_ENU_to_sac_in_local_ENZ.py $sem_config_dir/meshfem3D_files/mesh_par.py  $event_dir/DATA/FORCESOLUTION.lla $event_dir/DATA/STATIONS.lla $sem_band_code $event_dir/\$out_dir/seis $event_dir/\$out_dir/sac
 
-#chmod a+w -R $event_dir/forward_saved_frames
-#rm -rf $event_dir/forward_saved_frames
-#mv $event_dir/DATABASES_MPI $event_dir/forward_saved_frames
-#chmod a-w -R $event_dir/forward_saved_frames
+chmod a+w -R $event_dir/save_forward
+rm -rf $event_dir/save_forward
+mv $event_dir/DATABASES_MPI $event_dir/save_forward
+chmod a-w -R $event_dir/save_forward
 
 echo
 echo "Done: JOB_ID=\${SLURM_JOB_ID} [\$(date)]"
@@ -168,8 +168,17 @@ $sem_utils_dir/misfit/plot_misfit.py $misfit_par $db_file $figure_dir
 
 #------ adjoint source for kernel simulation
 rm -rf $event_dir/adj_kernel
-mkdir -p $event_dir/adj_kernel
-$sem_utils_dir/misfit/output_adj.py $misfit_par $db_file $event_dir/adj_kernel
+mkdir -p $event_dir/adj_kernel/local_ENU
+$sem_utils_dir/misfit/output_adj.py $misfit_par $db_file $event_dir/adj_kernel/local_ENU
+
+# coordinate conversion (local ENZ -> REF_ENU)
+$sem_utils_dir/sem/meshfem3d/convert_ascii_from_local_ENZ_to_REF_ENU.py \
+  $sem_config_dir/meshfem3D_files/mesh_par.py \
+  $event_dir/DATA/FORCESOLUTION.lla \
+  $event_dir/DATA/STATIONS.lla \
+  $adj_band_code \
+  $event_dir/adj_kernel/local_ENU \
+  $event_dir/adj_kernel/
 
 # make STATIONS_ADJOINT
 cd $event_dir/adj_kernel
@@ -193,9 +202,6 @@ cat <<EOF > $kernel_job
 #SBATCH -n $slurm_nproc
 #SBATCH -p $slurm_partition
 #SBATCH -t $slurm_timelimit_adjoint
-#SBATCH --mail-user=kai.tao@utexas.edu
-#SBATCH --mail-type=begin
-#SBATCH --mail-type=end
 
 echo
 echo "Start: JOB_ID=\${SLURM_JOB_ID} [\$(date)]"
@@ -207,7 +213,7 @@ cd $event_dir/DATA
 chmod u+w Par_file
 sed -i "/^SIMULATION_TYPE/s/=.*/= 3/" Par_file
 sed -i "/^SAVE_FORWARD/s/=.*/= .false./" Par_file
-sed -i "/^ANISOTROPIC_KL/s/=.*/= .true./" Par_file
+sed -i "/^ANISOTROPIC_KL/s/=.*/= .false./" Par_file
 sed -i "/^SAVE_TRANSVERSE_KL_ONLY/s/=.*/= .false./" Par_file
 sed -i "/^APPROXIMATE_HESS_KL/s/=.*/= .false./" Par_file
 
@@ -223,22 +229,23 @@ ln -sf \$out_dir OUTPUT_FILES
 
 rm -rf $event_dir/DATABASES_MPI
 mkdir $event_dir/DATABASES_MPI
-ln -s $event_dir/forward_saved_frames/*.bin $event_dir/DATABASES_MPI
 
-cp $mesh_dir/OUTPUT_FILES/addressing.txt OUTPUT_FILES
+ln -s $event_dir/save_forward/*.bin $event_dir/DATABASES_MPI
+
+cp $mesh_dir/OUTPUT_FILES/values_from_mesher.h OUTPUT_FILES
+#cp $mesh_dir/OUTPUT_FILES/addressing.txt OUTPUT_FILES
 cp -L DATA/Par_file OUTPUT_FILES
 cp -L DATA/STATIONS_ADJOINT OUTPUT_FILES
-cp -L DATA/CMTSOLUTION OUTPUT_FILES
+#cp -L DATA/CMTSOLUTION OUTPUT_FILES
 
 cd $event_dir
 ${slurm_mpiexec} $sem_build_dir/bin/xspecfem3D
 
-mkdir $event_dir/\$out_dir/sac
-mv $event_dir/\$out_dir/*.sac $event_dir/\$out_dir/sac
+#mkdir $event_dir/\$out_dir/sac
+#mv $event_dir/\$out_dir/*.sac $event_dir/\$out_dir/sac
 
 mkdir $event_dir/\$out_dir/kernel
-mv $event_dir/DATABASES_MPI/*reg1_cijkl_kernel.bin $event_dir/\$out_dir/kernel/
-mv $event_dir/DATABASES_MPI/*reg1_rho_kernel.bin $event_dir/\$out_dir/kernel/
+mv $event_dir/DATABASES_MPI/*_kernel.bin $event_dir/\$out_dir/kernel/
 
 echo
 echo "Done: JOB_ID=\${SLURM_JOB_ID} [\$(date)]"

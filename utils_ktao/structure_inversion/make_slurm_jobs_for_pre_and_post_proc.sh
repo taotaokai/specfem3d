@@ -41,9 +41,6 @@ cat <<EOF > $mesh_job
 #SBATCH -n $slurm_nproc
 #SBATCH -p $slurm_partition
 #SBATCH -t $slurm_timelimit_misfit
-#SBATCH --mail-user=kai.tao@utexas.edu
-#SBATCH --mail-type=begin
-#SBATCH --mail-type=end
 
 echo
 echo "Start: JOB_ID=\${SLURM_JOB_ID} [\$(date)]"
@@ -76,6 +73,7 @@ sed -i "/^MODEL/s/=.*/= GLL/" \$mesh_dir/DATA/Par_file
 
 cd \$mesh_dir
 ${slurm_mpiexec} $sem_build_dir/bin/xmeshfem3D
+${slurm_mpiexec} $sem_build_dir/bin/xgenerate_databases
 
 echo
 echo "Done: JOB_ID=\${SLURM_JOB_ID} [\$(date)]"

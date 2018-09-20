@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """make STATIONS file
-convert from lon/lat/depth to regional ENU
+convert from lon/lat/depth to REF_ENU
 """
 import sys
 import warnings
