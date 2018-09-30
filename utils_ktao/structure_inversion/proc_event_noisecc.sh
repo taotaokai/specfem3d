@@ -25,7 +25,8 @@ event_list=${2:?[arg]need event_list}
 source $control_file
 
 #------ process each event
-for event_id in $(awk -F"|" 'NF&&$1!~/#/{printf "%s.%s.%s.%s", $1,$2,$3,$4}' $event_list)
+awk -F"|" 'NF&&$1!~/#/{printf "%s.%s.%s.%s\n", $1,$2,$3,$4}' $event_list > event_id.lst
+for event_id in $(cat event_id.lst)
 do
   echo "====== $event_id"
 
@@ -43,7 +44,7 @@ do
     echo "[ERROR] $force_file not found"
     exit -1
   fi
-  rm $event_dir/DATA/FORCESOLUTION.lla
+  #rm $event_dir/DATA/FORCESOLUTION.lla
   cp $force_file $event_dir/DATA/FORCESOLUTION.lla
 
   # only for compatibility with misfit/read_data.py
@@ -55,7 +56,11 @@ do
     echo "[ERROR] $station_file not found"
     exit -1
   fi
-  cp $station_file $event_dir/DATA/STATIONS.lla
+  #cp $station_file $event_dir/DATA/STATIONS.lla
+  # remove dumplicated source-station pair, i.e. one source-station pair should only contribute one waveform
+  sed -n "1,/${event_id}/p" event_id.lst | awk -F'.' '{printf "%s[ ]*%s.%s\n",$1,$2,$3}' > grep.f
+  grep -v -f grep.f $station_file > $event_dir/DATA/STATIONS.lla
+
   #remove stations too close to the mesh western boundary
   #awk '$1!~/#/{if($3<40 && $4>90) print $0; if($3>=40 && $4>=87) print $0;}' $station_file > $event_dir/DATA/STATIONS
 

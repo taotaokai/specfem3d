@@ -223,7 +223,7 @@ class Misfit(object):
                         'proj_matrix':array([3,3]) },
 
                     'quality': {
-                        'Amax_obs':, 'Amax_noise':, 'Amax_syn':, 'SNR':, },
+                        'Amax_obs':, 'Astd_noise':, 'Amax_syn':, 'SNR':, },
 
                     'cc': {'time':, 'cc':, 'cc_tshift': 
                         'CC0':, 'CCmax':, 'AR0':, 'ARmax':},
@@ -313,6 +313,9 @@ class Misfit(object):
   def setup_event(self, cmt_file, ECEF=False, GPS_ELLPS="WGS84"):
     """cmt_file (str): CMTSOLUTION format file
     """
+    #FIXME: need to add the case for point force
+    # def read_cmtsolution()
+    # def read_forcesolution()
     with open(cmt_file, 'r') as f:
       lines = [ x for x in f.readlines() if not(x.startswith('#')) ]
 
@@ -1039,10 +1042,10 @@ class Misfit(object):
     station_dict = self.data['station']
 
     if left_pad < 0:
-      warnings.warn("[arg] left_pad must g.e. 0, set to 0.0")
+      warnings.warn("[arg] left_pad must be positive, set to 0.0")
       left_pad = 0
     if right_pad < 0:
-      warnings.warn("[arg] right_pad must g.e. 0, set to 0.0")
+      warnings.warn("[arg] right_pad must be positive, set to 0.0")
       right_pad = 0
     if obs_preevent < 0:
       obs_preevent = 50.0
@@ -1774,7 +1777,8 @@ class Misfit(object):
         'SNR':[10,15], 
         'CC0':[0.5,0.7],
         'CCmax':None,
-        'dist':None}
+        'dist':None},
+      water_level=0.01, 
       ):
     """ 
     calculate adjoint sources (dchi_du)
@@ -1786,6 +1790,9 @@ class Misfit(object):
       ccdt: cross-correlation traveltime
       phcc: phase correlation (for ambient noise correlogram)
     weight_param : SNR, CCmax, CC0, cc_tshift
+    water_level: water level to stablize calculation of 
+      spectral amplitude ratio between obs and syn. 
+      Only used when misfit_type=phcc.  
 
     Notes
     -----
@@ -1955,20 +1962,21 @@ class Misfit(object):
         #------ measure SNR (based on maximum amplitude)
         Amax_obs = np.sqrt(np.max(np.sum(obs_filt_win**2, axis=0)))
         Amax_syn = np.sqrt(np.max(np.sum(syn_filt_win**2, axis=0)))
-        Amax_noise =  np.sqrt(np.max(np.sum(noise_filt_win**2, axis=0)))
+        Astd_noise =  np.std(np.sum(noise_filt_win**2, axis=0)**0.5)
         if Amax_obs == 0: # bad record
           print('[WARN] %s:%s empty obs trace, SKIP.' % (
             station_id, window_id))
           window['stat']['code'] = -1
           window['stat']['msg'] = "Amax_obs=0"
           continue
-        if Amax_noise == 0: # could occure when the data begin time is too close to the first arrival
+        if Astd_noise == 0: # could occure when the data begin time is too close to the first arrival
           print('[WARN] %s:%s empty noise trace, SKIP.' % (
             station_id, window_id))
           window['stat']['code'] = -1
-          window['stat']['msg'] = "Amax_noise=0"
+          window['stat']['msg'] = "Astd_noise=0"
           continue
-        snr = 20.0 * np.log10(Amax_obs/Amax_noise)
+        #snr = 20.0 * np.log10(Amax_obs/Astd_noise)
+        snr = Amax_obs/Astd_noise
  
         #------ measure CC time shift (between w*F*d and w*F*u)
         obs_norm = np.sqrt(np.sum(obs_filt_win**2))
@@ -1979,6 +1987,7 @@ class Misfit(object):
         # CC means shifting syn in the positive time direction to match
         # the observed obs, and vice verser.
         # [-(nt-1), nt) * dt
+        #FIXME in case of phcc, we need phcc_tshift
         cc = np.zeros(2*syn_nt-1)
         for i in range(3):
           cc += signal.fftconvolve(
@@ -2048,17 +2057,17 @@ class Misfit(object):
           abs_fft_wFu = np.sum(np.abs(fft_wFu)**2, axis=0, keepdims=True)**0.5
           abs_fft_wFd = np.sum(np.abs(fft_wFd)**2, axis=0, keepdims=True)**0.5
           abs_fft_wFu_wl = np.copy(abs_fft_wFu)
-          wl_thred = 0.01*np.max(abs_fft_wFu) #FIXME water-level coef. 0.01 is hard coded here!
+          wl_thred = water_level*np.max(abs_fft_wFu)
           abs_fft_wFu_wl[abs_fft_wFu<wl_thred] = wl_thred
-          trans_H = abs_fft_wFd/abs_fft_wFu_wl
-          dchiw_du = trans_H / norm_N * (
+          spec_ratio = abs_fft_wFd/abs_fft_wFu_wl
+          dchiw_du = spec_ratio / norm_N * (
               fft_wFd -
               fft_wFu*np.real(np.sum(fft_wFd*np.conj(fft_wFu),axis=0,keepdims=True))/abs_fft_wFu_wl**2)
           dchiw_du = np.fft.irfft(dchiw_du)*win_func
           dchiw_du = signal.filtfilt(filter_b, filter_a, dchiw_du[:,::-1])
           dchiw_du = dchiw_du[:,::-1]
           # phase correlation value
-          HwFu = np.fft.irfft(trans_H*fft_wFu)
+          HwFu = np.fft.irfft(spec_ratio*fft_wFu)
           phcc = np.sum(obs_filt_win*HwFu)/norm_N
         elif misfit_type == 'ccdt':
           # misfit: cross-correlation traveltime difference -1*|ccdtau|^2
@@ -2111,19 +2120,20 @@ class Misfit(object):
         #------ record results
         quality_dict = {
             'Amax_obs': Amax_obs, 'Amax_syn': Amax_syn, 
-            'Amax_noise': Amax_noise, 'SNR': snr}
+            'Astd_noise': Astd_noise, 'SNR': snr}
         cc_dict = {
             #'time': cc_times, 'cc': cci,
             'cc_tshift': CC_time_shift,
             'CC0': CC0, 'CCmax': CCmax,
             'AR0': AR0, 'ARmax': ARmax,
             'Nw':Nw, 'Aw':Aw }
+        if misfit_type == 'phcc':
+          cc_dict['phcc'] = phcc
         window['quality'] = quality_dict
         window['cc'] = cc_dict
         window['weight'] = weight
         window['misfit_type'] = misfit_type
-        if misfit_type == 'phcc':
-          cc_dict['phcc'] = phcc
+        window['water_level'] = water_level
         window['stat'] = {'code': 1, 
             'msg': "measure adj on "+UTCDateTime.now().isoformat()}
 
@@ -2140,7 +2150,7 @@ class Misfit(object):
               plt.title('%s dt %.2f CCmax %.3f ARmax %.3f CC0 %.3f '
                   'AR0 %.3f \nAobs %g Anoise %g SNR %.1f weight %.3f'
                   % (station_id, CC_time_shift, CCmax, ARmax, 
-                    CC0, AR0, Amax_obs, Amax_noise, snr, weight) )
+                    CC0, AR0, Amax_obs, Astd_noise, snr, weight) )
             idx_plt = range(syn_nl,(syn_nl+syn_npts))
             plt.plot(t[idx_plt], obs_filt[i,idx_plt]/Amax_obs, 'k', linewidth=0.2)
             plt.plot(t[idx_plt], syn_filt[i,idx_plt]/Amax_obs*Aw, 'r', linewidth=0.2)
@@ -4911,6 +4921,7 @@ class Misfit(object):
       plot_az0=0,
       plot_adj=False, # whether plot adjoint source
       align_time=False, # whether align the phase according to cc time shift
+      point_force=False, # whether the source is a point force
       ):
     """ 
     Plot record section in azimuthal bins
@@ -5136,6 +5147,23 @@ class Misfit(object):
         else:
           err = "station(%s) has no syn or grn in waveform data." % (station_id)
           raise Exception(err)
+        # phcc: transfer the spectral amplitude of syn to obs
+        if window['misfit_type'] == 'phcc':
+          win_func = window['taper']['win']
+          proj_matrix = window['polarity']['proj_matrix']
+          water_level = window['water_level']
+          wFu = np.dot(proj_matrix, syn) * win_func
+          wFd = np.dot(proj_matrix, obs) * win_func
+          fft_wFu = np.fft.rfft(wFu)
+          fft_wFd = np.fft.rfft(wFd)
+          abs_fft_wFu = np.sum(np.abs(fft_wFu)**2, axis=0, keepdims=True)**0.5
+          abs_fft_wFd = np.sum(np.abs(fft_wFd)**2, axis=0, keepdims=True)**0.5
+          abs_fft_wFu_wl = np.copy(abs_fft_wFu)
+          wl_thred = water_level*np.max(abs_fft_wFu)
+          abs_fft_wFu_wl[abs_fft_wFu<wl_thred] = wl_thred
+          spec_ratio = abs_fft_wFd/abs_fft_wFu_wl
+          syn = np.fft.irfft(fft_wFu * spec_ratio)
+
         # project to polarity defined by the window
         polarity = window['polarity']
         comp = polarity['component']
@@ -5203,7 +5231,7 @@ class Misfit(object):
           fontsize=10, fmt='%3.0f')
       sx, sy = ax_bm(stlo_all, stla_all)
       ax_bm.scatter(sx, sy, s=10, marker='^', facecolor='blue', edgecolor='')
-      # plot focal mechanism
+      # plot focal mechanism FIXME: should treat point force 
       sx, sy = ax_bm(evlo, evla)
       bb_width = 110000.0 * np.abs(max(stlo_all)-min(stlo_all)) * 0.1
       b = beach(focmec, xy=(sx, sy), width=bb_width, linewidth=0.2, facecolor='r')
@@ -5382,8 +5410,11 @@ class Misfit(object):
         #  ax.text(max(plot_time), dist_degree, ' %.1f' % (window['weight']),
         #      verticalalignment='center', fontsize=7)
         ##annotate station names 
-        str_annot = ' %s (%.3f,%.3f,%.1f)' % (station_id,
-            window['cc']['CC0'], window['cc']['cc_tshift'], window['weight'])
+        str_annot = ' %s (%.3f,%.3f,%.1f)' % (
+          station_id, window['cc']['CC0'], window['cc']['cc_tshift'], window['weight'])
+        if window['misfit_type'] == 'phcc':
+          str_annot = ' %s (%.3f,%.3f,%.1f)' % (
+            station_id, window['cc']['phcc'], window['cc']['cc_tshift'], window['weight'])
         ax_1comp.text(max(plot_time), dist_degree, str_annot, 
             verticalalignment='center', fontsize=7)
         #ax_1comp.text(160, dist_degree, str_annot, 

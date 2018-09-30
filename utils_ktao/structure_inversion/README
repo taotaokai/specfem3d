@@ -7,8 +7,10 @@ event_list=event.txt
 
 utils_dir=~/seiscode/sem_utils/utils/misfit_v0
 
+# create randomly selected event list
+$utils_dir/structure_inversion/random_select_stations.sh $control_file ${minimum_inter_station_distance} event.txt
 # create slurm jobs for pre-/post-processing
-$utils_dir/structure_inversion/make_slurm_jobs_for_postproc.sh $control_file $event_list
+$utils_dir/structure_inversion/make_slurm_jobs_for_pre_and_post_proc.sh $control_file $event_list
 # create directory and slurm jobs for each event
 $utils_dir/structure_inversion/proc_event.sh $control_file $event_list
 

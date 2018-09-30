@@ -40,7 +40,7 @@ cat <<EOF > $mesh_job
 #SBATCH -N $slurm_nnode
 #SBATCH -n $slurm_nproc
 #SBATCH -p $slurm_partition
-#SBATCH -t $slurm_timelimit_misfit
+#SBATCH -t $slurm_timelimit_mesh
 
 echo
 echo "Start: JOB_ID=\${SLURM_JOB_ID} [\$(date)]"
@@ -55,19 +55,22 @@ then
   exit -1
 fi
 
-#rm -rf \$mesh_dir
+rm -rf \$mesh_dir
 mkdir -p \$mesh_dir
 
 cd \$mesh_dir
 mkdir DATA DATABASES_MPI OUTPUT_FILES
 
 cd \$mesh_dir/DATA
-ln -sf $sem_build_dir/DATA/* \$mesh_dir/DATA/
-rm Par_file GLL CMTSOLUTION
+#ln -sf $sem_build_dir/DATA/* \$mesh_dir/DATA/
+#rm Par_file GLL CMTSOLUTION FORCESOLUTION
 ln -sf \$model_dir GLL
 cp -L $sem_config_dir/DATA/Par_file .
 cp -L $sem_config_dir/DATA/CMTSOLUTION .
-cp -L Par_file CMTSOLUTION \$mesh_dir/OUTPUT_FILES/
+cp -L $sem_config_dir/DATA/FORCESOLUTION .
+cp -L Par_file \$mesh_dir/OUTPUT_FILES/
+
+ln -s $sem_config_dir/meshfem3D_files \$mesh_dir/DATA/
 
 sed -i "/^MODEL/s/=.*/= GLL/" \$mesh_dir/DATA/Par_file
 
@@ -80,6 +83,8 @@ echo "Done: JOB_ID=\${SLURM_JOB_ID} [\$(date)]"
 echo
 
 EOF
+
+exit -1
 
 #====== kernel_sum
 cat <<EOF > $kernel_sum_job
