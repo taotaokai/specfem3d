@@ -1,0 +1,18 @@
+#!/bin/bash
+#SBATCH -J vtk
+#SBATCH -o vtk.job.o%j
+#SBATCH -N 1
+#SBATCH -n 1
+#SBATCH -p normal
+#SBATCH -t 00:30:00
+
+echo
+echo "Start: JOB_ID=${SLURM_JOB_ID} [$(date)]"
+echo
+
+mpirun -np 1 /work/03244/ktao/EastTibet_NoiseCC_FWI/specfem3d/bin/xcombine_vol_data_vtk 0 249 vs DATABASES_MPI/ ./ 0
+
+echo
+echo "Done: JOB_ID=${SLURM_JOB_ID} [$(date)]"
+echo
+
