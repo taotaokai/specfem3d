@@ -6,7 +6,7 @@ import numpy as np
 #
 import pyproj
 #
-import importlib
+
 
 from obspy import UTCDateTime
 from obspy.io.sac import SACTrace
@@ -33,9 +33,11 @@ out_dir = str(sys.argv[6])
 if sys.version_info < (3, ):
   raise Exception("need python3")
 elif sys.version_info < (3, 5):
+  import importlib
   spec =importlib.machinery.SourceFileLoader("mesh_par", mesh_par_file)
   par = spec.load_module()
 else:
+  import importlib.util
   spec = importlib.util.spec_from_file_location("mesh_par", mesh_par_file)
   par = importlib.util.module_from_spec(spec)
   spec.loader.exec_module(par)

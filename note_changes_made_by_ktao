@@ -1,4 +1,7 @@
 # Some subroutines are tweaked/added to suit my needs.
+ 
+#====== remove -xHost 
+flag.guess: remove -xHost for ifort
 
 #====== Skip reading the first line in FORCESOLUTION
 

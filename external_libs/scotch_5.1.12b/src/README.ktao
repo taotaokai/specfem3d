@@ -1,0 +1,7 @@
+Copy the appropriate make.inc file from Make.inc/ and rename to Makefile.inc.in
+
+  - x86_64_icc
+
+Add "-lpthread" to LDFLAGS in Makefile.inc.in "LDFLAGS		= -g -lz -lm -lpthread "
+
+CFLAGS      = -xCORE-AVX2 -axCORE-AVX512,MIC-AVX512 ...

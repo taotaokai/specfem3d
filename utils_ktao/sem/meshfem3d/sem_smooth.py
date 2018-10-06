@@ -15,7 +15,6 @@ from scipy import spatial
 from mpi4py import MPI
 
 import pyproj
-import importlib
 
 from meshfem3d_utils import rotmat_enu_to_ecef 
 from meshfem3d_utils import sem_mesh_read, sem_mesh_get_vol_gll
@@ -48,9 +47,11 @@ nmodel = len(model_names)
 if sys.version_info < (3, ):
   raise Exception("need python3")
 elif sys.version_info < (3, 5):
+  import importlib
   spec =importlib.machinery.SourceFileLoader("mesh_par", mesh_par_file)
   par = spec.load_module()
 else:
+  import importlib.util
   spec = importlib.util.spec_from_file_location("mesh_par", mesh_par_file)
   par = importlib.util.module_from_spec(spec)
   spec.loader.exec_module(par)
@@ -95,7 +96,7 @@ for iproc_target in range(mpi_rank,nproc,mpi_size):
   #====== loop over each contribution mesh slice
   for iproc_contrib in range(nproc):
 
-    print("--- contrib proc# ", iproc_contrib)
+    print("--- contrib proc# %d (target proc# %d)"%(iproc_contrib, iproc_target))
     sys.stdout.flush()
     #start = time.clock()
 
