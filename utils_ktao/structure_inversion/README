@@ -39,6 +39,7 @@ $utils_dir/submit_slurm_jobs.sh slurm hess_sum
 
 # 3. post-processing
 $utils_dir/submit_slurm_jobs.sh slurm kernel_sum,pcg_dmodel,model_perturb,mesh_perturb
+#./utils/structure_inversion/sem_sum_event_kernel_serial.py 250 mesh/DATABASES_MPI/ kernel_dir.list alpha_kernel,beta_kernel,rho_kernel kernel
 
 # 4. line search
 # perturb
