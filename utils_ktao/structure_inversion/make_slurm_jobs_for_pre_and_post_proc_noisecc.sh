@@ -109,7 +109,13 @@ do
   event_dir=$iter_dir/\$event_id
   mask_list=\$event_dir/output_kernel/kernel/sr_mask.lst
   awk 'NR==6{print \$0, a, b}' a=$source_mask_sigmaH_meter b=$source_mask_sigmaV_meter \$event_dir/output_kernel/sr.vtk > \$mask_list
-  awk 'NR>=6&&NF==3{print \$0, a,b}' a=$receiver_mask_sigmaH_meter b=$receiver_mask_sigmaV_meter \$event_dir/output_kernel/sr.vtk >> \$mask_list
+
+  if [ x${receiver_mask_sigmaH_meter} = x ]
+  then
+    echo "[WARN] receiver_mask is not set and no receiver mask will be used."
+  else
+    awk 'NR>=6&&NF==3{print \$0, a,b}' a=$receiver_mask_sigmaH_meter b=$receiver_mask_sigmaV_meter \$event_dir/output_kernel/sr.vtk >> \$mask_list
+  fi
 
   ${slurm_mpiexec} mypython $sem_utils_dir/structure_inversion/sem_make_mask_parallel.py \
     $sem_config_dir/meshfem3D_files/mesh_par.py \
@@ -117,49 +123,30 @@ do
     \$event_dir/output_kernel/kernel/sr_mask.lst \$event_dir/output_kernel/kernel/
 done
 
-echo "====== sum up event kernels [\$(date)]"
+echo "====== sum up event kernels with mask [\$(date)]"
 
 awk -F"|" 'NF&&\$1!~/#/{printf "%s/%s.%s.%s.%s/output_kernel/kernel\\n", a,\$1,\$2,\$3,\$4}' \
   a="$iter_dir" $event_list > $iter_dir/kernel_dir.list
 #awk -F"|" 'NF&&\$1!~/#/{printf "%s/%s/output_kernel/kernel\\n", a,\$9}' \
 #  a="$iter_dir" $event_list > $iter_dir/kernel_dir.list
 
-out_dir=$iter_dir/kernel
+out_dir=$iter_dir/kernel_mask_sum
 mkdir \$out_dir
 
 ${slurm_mpiexec} mypython $sem_utils_dir/structure_inversion/sem_sum_event_kernel_with_mask_parallel.py \
   $sem_nproc $mesh_dir/DATABASES_MPI \
-  $iter_dir/kernel_dir.list alpha_kernel,beta_kernel,rho_kernel mask \
+  $iter_dir/kernel_dir.list $kernel_tags  mask \
   \$out_dir
 
-#echo ------ sum up cijkl,rho_kernel with source and receiver mask
-#
-#${slurm_mpiexec} $sem_utils_dir/bin/xsem_sum_event_kernels_cijkl \
-#  $sem_nproc $mesh_dir/DATABASES_MPI \
-#  kernel_dir.list cijkl_kernel \
-#  1 "mask" \
-#  \$out_dir cijkl_kernel
-#
-#${slurm_mpiexec} $sem_utils_dir/bin/xsem_sum_event_kernels_1 \
-#  $sem_nproc $mesh_dir/DATABASES_MPI \
-#  kernel_dir.list rho_kernel \
-#  1 "mask" \
-#  \$out_dir rho_kernel
+echo "====== smooth summed&masked event kernel [\$(date)]"
 
-#echo "------ convert cijkl,rho_kernel to aijkl,rhoprime kernel [\$(date)]"
-#
-#${slurm_mpiexec} $sem_utils_dir/bin/xsem_kernel_cijkl_rho_to_aijkl_rhoprime_in_tiso \
-#  $sem_nproc $mesh_dir/DATABASES_MPI $model_dir \
-#  \$out_dir \
-#  \$out_dir
-#
-#echo "------ reduce aijkl_kernel to alpha,beta,phi,xi,eta_kernel [\$(date)]"
-#
-#${slurm_mpiexec} $sem_utils_dir/bin/xsem_kernel_aijkl_to_tiso_in_alpha_beta_phi_xi_eta \
-#  $sem_nproc $mesh_dir/DATABASES_MPI $model_dir \
-#  \$out_dir \
-#  \$out_dir
-#
+mkdir $iter_dir/kernel_mask_sum_smooth
+
+${slurm_mpiexec} mypython $sem_utils_dir/meshfem3d/sem_smooth.py \
+  $sem_config_dir/meshfem3D_files/mesh_par.py ${sem_nproc} $mesh_dir/DATABASES_MPI/ \
+  $iter_dir/kernel_mask_sum/ ${kernel_tags} ${kernel_smooth_sigmaH_meter} ${kernel_smooth_sigmaV_meter} \
+  $iter_dir/kernel_mask_sum_smooth/
+
 #echo ====== precondition kernel
 #
 #for kernel_tag in alpha beta phi xi eta

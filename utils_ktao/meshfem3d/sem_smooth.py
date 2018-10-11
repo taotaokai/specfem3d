@@ -30,18 +30,24 @@ nproc = int(sys.argv[2])
 mesh_dir = str(sys.argv[3]) # <mesh_dir>/proc******_external_mesh.bin
 model_dir = str(sys.argv[4]) # <model_dir>/proc******_<model_name>.bin
 model_names = str(sys.argv[5]) # comma delimited e.g. vp,vs,rho,qmu,qkappa
-sigma_h = float(sys.argv[6]) # e.g. 2000 meters, horizontal smoothing length
-sigma_r = float(sys.argv[7]) # e.g. 2000 meters, radial smoothing length
+sigma_h = str(sys.argv[6]) # horizontal smoothing length, comma delimited same # as model_names
+sigma_r = str(sys.argv[7]) # radial smoothing length, comma delimited same # as model_names
 out_dir = str(sys.argv[8])
 
 #--- Gaussian smoothing kernel 
+sigma_h = np.array([ float(x) for x in sigma_h.split(',') ])
+sigma_r = np.array([ float(x) for x in sigma_r.split(',') ])
 sigma2_h = sigma_h**2
 sigma2_r = sigma_r**2
-search_radius = 3.0*max(sigma_h, sigma_r) # search neighboring points
+search_radius = 3.0*np.max(np.stack((sigma_h,sigma_r))) # search neighboring points
 
 #--- model names
 model_names = model_names.split(',')
 nmodel = len(model_names)
+
+if len(sigma_h) != nmodel or len(sigma_r) != nmodel:
+  print("[ERROR] sigma_h/r must has the same length as model_names")
+  sys.exit(-1)
 
 #--- load mesh parameter file
 if sys.version_info < (3, ):
@@ -91,7 +97,7 @@ for iproc_target in range(mpi_rank,nproc,mpi_size):
   xyz_glob_target = xyz_ref.reshape((3,1)) + np.dot(ref_rotmat,mesh_target['xyz_glob'])
 
   weight_model_gll_target = np.zeros((nmodel,)+gll_dims_target)
-  weight_gll_target = np.zeros(gll_dims_target)
+  weight_gll_target = np.zeros((nmodel,)+gll_dims_target)
 
   #====== loop over each contribution mesh slice
   for iproc_contrib in range(nproc):
@@ -173,13 +179,11 @@ for iproc_target in range(mpi_rank,nproc,mpi_size):
 
       #print(ngll_target, ngll_contrib)
       weight_model_val = np.empty((nmodel,NGLLX,NGLLY,NGLLZ))
-      weight_val = np.empty((NGLLX,NGLLY,NGLLZ))
-      weight_model_val, weight_val = smooth_gauss_cap(xyz_gll_target, xyz_gll_contrib, 
-                                                      model_gll, vol_gll, 
-                                                      sigma2_h, sigma2_r)
+      weight_val = np.empty((nmodel,NGLLX,NGLLY,NGLLZ))
+      weight_model_val, weight_val = smooth_gauss_cap(xyz_gll_target, xyz_gll_contrib, vol_gll, model_gll, sigma2_h, sigma2_r)
 
       weight_model_gll_target[:,:,:,:,ispec_target] += weight_model_val.reshape((nmodel,NGLLX,NGLLY,NGLLZ))
-      weight_gll_target[:,:,:,ispec_target] += weight_val.reshape((NGLLX,NGLLY,NGLLZ))
+      weight_gll_target[:,:,:,:,ispec_target] += weight_val.reshape((nmodel,NGLLX,NGLLY,NGLLZ))
 
       #r_gll_target = np.sum(xyz_gll_target**2, axis=0)**0.5
       #ngll_target = len(r_gll_target)
