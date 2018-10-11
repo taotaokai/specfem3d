@@ -26,7 +26,7 @@ points = np.zeros((npoint,2))
 points[:,0] = x
 points[:,1] = y
 
-randsize = npoint
+randsize = 5*npoint
 randint = np.random.randint(0,npoint,randsize)
 
 pts_select = np.zeros(points.shape)
