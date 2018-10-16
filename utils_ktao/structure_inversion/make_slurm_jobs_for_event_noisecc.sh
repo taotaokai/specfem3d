@@ -85,12 +85,12 @@ mkdir -p $event_dir/DATA
 cd $event_dir/DATA
 
 # convert STATION to REF_ENU
-$sem_utils_dir/sem/meshfem3d/convert_STATIONS_from_geodesic_to_REF_ENU.py $sem_config_dir/meshfem3D_files/mesh_par.py  $sem_config_dir/meshfem3D_files/topo.grd STATIONS.lla tmp
+$python_exec $sem_utils_dir/meshfem3d/convert_STATIONS_from_geodesic_to_REF_ENU.py $sem_config_dir/meshfem3D_files/mesh_par.py  $sem_config_dir/meshfem3D_files/topo.grd STATIONS.lla tmp
 grep -v nan tmp > STATIONS
 rm tmp
 
 # convert FORCESOLUTION to REF_ENU
-$sem_utils_dir/sem/meshfem3d/convert_FORCESOLUTION_from_geodesic_to_REF_ENU.py $sem_config_dir/meshfem3D_files/mesh_par.py  $sem_config_dir/meshfem3D_files/topo.grd FORCESOLUTION.lla FORCESOLUTION
+$python_exec $sem_utils_dir/meshfem3d/convert_FORCESOLUTION_from_geodesic_to_REF_ENU.py $sem_config_dir/meshfem3D_files/mesh_par.py  $sem_config_dir/meshfem3D_files/topo.grd FORCESOLUTION.lla FORCESOLUTION
 
 cp $mesh_dir/DATA/Par_file .
 sed -i "/^SIMULATION_TYPE/s/=.*/= 1/" Par_file
@@ -119,7 +119,7 @@ mkdir $event_dir/\$out_dir/seis
 mv $event_dir/\$out_dir/*.sem? $event_dir/\$out_dir/seis
 
 mkdir $event_dir/\$out_dir/sac
-$sem_utils_dir/sem/meshfem3d/convert_ascii_in_REF_ENU_to_sac_in_local_ENZ.py $sem_config_dir/meshfem3D_files/mesh_par.py  $event_dir/DATA/FORCESOLUTION.lla $event_dir/DATA/STATIONS.lla $sem_band_code $event_dir/\$out_dir/seis $event_dir/\$out_dir/sac
+$python_exec $sem_utils_dir/meshfem3d/convert_ascii_in_REF_ENU_to_sac_in_local_ENZ.py $sem_config_dir/meshfem3D_files/mesh_par.py  $event_dir/DATA/FORCESOLUTION.lla $event_dir/DATA/STATIONS.lla $sem_band_code $event_dir/\$out_dir/seis $event_dir/\$out_dir/sac
 
 chmod a+w -R $event_dir/save_forward
 rm -rf $event_dir/save_forward
@@ -150,7 +150,7 @@ cd $event_dir
 
 rm -rf $misfit_dir
 mkdir -p $misfit_dir
-$sem_utils_dir/misfit/read_data.py \
+$python_exec $sem_utils_dir/misfit/read_data.py \
   $misfit_par \
   $db_file \
   $event_dir/DATA/CMTSOLUTION.lla \
@@ -158,21 +158,21 @@ $sem_utils_dir/misfit/read_data.py \
   $event_dir/output_syn/sac \
   $data_dir/$event_id/dis
 
-$sem_utils_dir/misfit/measure_misfit.py $misfit_par $db_file
+$python_exec $sem_utils_dir/misfit/measure_misfit.py $misfit_par $db_file
 
-$sem_utils_dir/misfit/output_misfit.py $db_file $misfit_dir/misfit.txt
+$python_exec $sem_utils_dir/misfit/output_misfit.py $db_file $misfit_dir/misfit.txt
 
 rm -rf $figure_dir
 mkdir -p $figure_dir
-$sem_utils_dir/misfit/plot_misfit.py $misfit_par $db_file $figure_dir
+$python_exec $sem_utils_dir/misfit/plot_misfit.py $misfit_par $db_file $figure_dir
 
 #------ adjoint source for kernel simulation
 rm -rf $event_dir/adj_kernel
 mkdir -p $event_dir/adj_kernel/local_ENU
-$sem_utils_dir/misfit/output_adj.py $misfit_par $db_file $event_dir/adj_kernel/local_ENU
+$python_exec $sem_utils_dir/misfit/output_adj.py $misfit_par $db_file $event_dir/adj_kernel/local_ENU
 
 # coordinate conversion (local ENZ -> REF_ENU)
-$sem_utils_dir/sem/meshfem3d/convert_ascii_from_local_ENZ_to_REF_ENU.py \
+$python_exec $sem_utils_dir/meshfem3d/convert_ascii_from_local_ENZ_to_REF_ENU.py \
   $sem_config_dir/meshfem3D_files/mesh_par.py \
   $event_dir/DATA/FORCESOLUTION.lla \
   $event_dir/DATA/STATIONS.lla \

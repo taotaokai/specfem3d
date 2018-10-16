@@ -1773,9 +1773,10 @@ class Misfit(object):
       cc_delta=0.01,
       misfit_type='cc0',
       weight_param={
-        'cc_tshift':[-10,-8, 8,10],
+        'cc_tshift':[-10,-5, 5,10],
         'SNR':[10,15], 
         'CC0':[0.5,0.7],
+        'phcc': [0.3,0.4],
         'CCmax':None,
         'dist':None},
       water_level=0.01, 
@@ -1789,6 +1790,7 @@ class Misfit(object):
       cc0: zero-lag cross-correlation misfit
       ccdt: cross-correlation traveltime
       phcc: phase correlation (for ambient noise correlogram)
+      phcc_ccdt: phase correlation and cross-correlation traveltime
     weight_param : SNR, CCmax, CC0, cc_tshift
     water_level: water level to stablize calculation of 
       spectral amplitude ratio between obs and syn. 
@@ -1987,7 +1989,7 @@ class Misfit(object):
         # CC means shifting syn in the positive time direction to match
         # the observed obs, and vice verser.
         # [-(nt-1), nt) * dt
-        #FIXME in case of phcc, we need phcc_tshift
+        #FIXME in case of phcc, we need phcc_tshift NOT NEEDED
         cc = np.zeros(2*syn_nt-1)
         for i in range(3):
           cc += signal.fftconvolve(
@@ -2019,24 +2021,9 @@ class Misfit(object):
         CC_time_shift = cc_times[imax]
         CCmax = cci[imax]
         ARmax = CCmax * syn_norm / obs_norm # amplitude ratio: syn/obs
-
-        #------ window weighting based on SNR and misfit
-        weight = window['pre_weight']
-        if 'SNR' in weight_param:
-          weight *= cosine_taper(snr, weight_param['SNR'])
-        if 'CCmax' in weight_param:
-          weight *= cosine_taper(CCmax, weight_param['CCmax'])
-        if 'CC0' in weight_param:
-          weight *= cosine_taper(CC0, weight_param['CC0'])
-        if 'dist' in weight_param:
-          dist = meta['dist_degree']
-          dist_range = np.array(weight_param['dist'])
-          weight *= cosine_taper(dist, dist_range)
-        if 'cc_tshift' in weight_param:
-          weight *= cosine_taper(CC_time_shift, weight_param['cc_tshift'])
+        Aw = CC0 * obs_norm / syn_norm # window amplitude raito
 
         #------ measure adjoint source
-        Aw = CC0 * obs_norm / syn_norm # window amplitude raito
         if misfit_type == 'cc0':
           # misfit: zero-lag cross-correlation
           # adjoint source: dchiw_du (misfit functional: zero-lag cc coef.)
@@ -2094,9 +2081,60 @@ class Misfit(object):
           #plt.subplot(414)
           #plt.plot(syn_times, dchiw_du[1,:])
           #plt.show()
+        elif misfit_type == 'phcc_ccdt':
+          #-- misfit 1: weighted phase correlation 
+          norm_N = np.sum(obs_filt_win**2)
+          fft_wFu = np.fft.rfft(syn_filt_win)
+          fft_wFd = np.fft.rfft(obs_filt_win)
+          abs_fft_wFu = np.sum(np.abs(fft_wFu)**2, axis=0, keepdims=True)**0.5
+          abs_fft_wFd = np.sum(np.abs(fft_wFd)**2, axis=0, keepdims=True)**0.5
+          abs_fft_wFu_wl = np.copy(abs_fft_wFu)
+          wl_thred = water_level*np.max(abs_fft_wFu)
+          abs_fft_wFu_wl[abs_fft_wFu<wl_thred] = wl_thred
+          spec_ratio = abs_fft_wFd/abs_fft_wFu_wl
+          dchiw_du = spec_ratio / norm_N * (
+              fft_wFd -
+              fft_wFu*np.real(np.sum(fft_wFd*np.conj(fft_wFu),axis=0,keepdims=True))/abs_fft_wFu_wl**2)
+          dchiw_du = np.fft.irfft(dchiw_du)*win_func
+          dchiw_du = signal.filtfilt(filter_b, filter_a, dchiw_du[:,::-1])
+          dchiw_du_phcc = dchiw_du[:,::-1]
+          # phase correlation value
+          HwFu = np.fft.irfft(spec_ratio*fft_wFu)
+          phcc = np.sum(obs_filt_win*HwFu)/norm_N
+          #-- misfit 2: minus cross-correlation traveltime difference -(1/2)*|ccdt|^2
+          #NOTE: *dt is put back to Nw
+          dwFu_dt = np.fft.irfft(fft_wFu*2.0j*np.pi*syn_freq, n=syn_nt)
+          w_dwFu_dt = win_func * dwFu_dt
+          # apply conj(F), for two-pass filter (zero phase) conj(F) = F
+          conjF_w_dwFu_dt = signal.filtfilt(filter_b, filter_a, w_dwFu_dt[:,::-1])
+          conjF_w_dwFu_dt = conjF_w_dwFu_dt[:,::-1]
+          # 
+          dchiw_du_ccdt = -1*CC_time_shift*conjF_w_dwFu_dt/np.sum(dwFu_dt**2)
+          #--- weight the two misfit
+          weight_ccdt = cosine_taper(abs(CC_time_shift), weight_param['cc_tshift'])
+          weight_phcc = cosine_taper(phcc, weight_param['phcc'])
+          weight_phcc *= 1.0 - cosine_taper(abs(CC_time_shift), weight_param['cc_tshift'][0:2])
+          dchiw_du = weight_ccdt*dchiw_du_ccdt + weight_phcc*dchiw_du_phcc
         else:
           error_str = "%s:%s: unknown misfit type (%s)" % (station_id, window_id, misfit_type)
           raise Exception(error_str)
+
+        #------ window weighting based on SNR and misfit
+        weight = window['pre_weight']
+        if 'SNR' in weight_param:
+          weight *= cosine_taper(snr, weight_param['SNR'])
+        if 'CCmax' in weight_param:
+          weight *= cosine_taper(CCmax, weight_param['CCmax'])
+        if 'CC0' in weight_param:
+          weight *= cosine_taper(CC0, weight_param['CC0'])
+        if 'dist' in weight_param:
+          dist = meta['dist_degree']
+          dist_range = np.array(weight_param['dist'])
+          weight *= cosine_taper(dist, dist_range)
+        if 'cc_tshift' in weight_param and misfit_type != 'phcc_ccdt':
+          weight *= cosine_taper(CC_time_shift, weight_param['cc_tshift'])
+        if 'phcc' in weight_param and misfit_type == 'phcc':
+          weight *= cosine_taper(phcc, weight_param['phcc'])
 
         #DEBUG
         #for i in range(3):
@@ -2132,6 +2170,9 @@ class Misfit(object):
         window['quality'] = quality_dict
         window['cc'] = cc_dict
         window['weight'] = weight
+        if misfit_type == 'phcc_ccdt':
+          window['weight_phcc'] = weight_phcc
+          window['weight_ccdt'] = weight_ccdt
         window['misfit_type'] = misfit_type
         window['water_level'] = water_level
         window['stat'] = {'code': 1, 
@@ -5153,7 +5194,7 @@ class Misfit(object):
           err = "station(%s) has no syn or grn in waveform data." % (station_id)
           raise Exception(err)
         # phcc: transfer the spectral amplitude of syn to obs
-        if window['misfit_type'] == 'phcc':
+        if window['misfit_type'] == 'phcc' or window['misfit_type'] == 'phcc_ccdt':
           win_func = window['taper']['win']
           proj_matrix = window['polarity']['proj_matrix']
           water_level = window['water_level']
@@ -5248,8 +5289,8 @@ class Misfit(object):
       ax_bm.scatter(sx, sy, s=10, marker='^', facecolor='red', edgecolor='')
 
       #-- create axis for seismograms
-      ax_origin = [0.45, 0.05]
-      ax_size = [0.43, 0.90]
+      ax_origin = [0.43, 0.05]
+      ax_size = [0.40, 0.90]
       #ax_size = [0.3, 0.90]
       ax_1comp = fig.add_axes(ax_origin + ax_size)
 
@@ -5417,9 +5458,13 @@ class Misfit(object):
         ##annotate station names 
         str_annot = ' %s (%.3f,%.3f,%.1f)' % (
           station_id, window['cc']['CC0'], window['cc']['cc_tshift'], window['weight'])
-        if window['misfit_type'] == 'phcc':
-          str_annot = ' %s (%.3f,%.3f,%.1f)' % (
+        if window['misfit_type'] == 'phcc' or window['misfit_type'] == 'phcc_ccdt':
+          str_annot = ' %s (%.2f,%.2f,%.1f)' % (
             station_id, window['cc']['phcc'], window['cc']['cc_tshift'], window['weight'])
+        if window['misfit_type'] == 'phcc_ccdt':
+          str_annot = ' %s (%.2f,%.2f,%.1f,%.1f)' % (
+            station_id, window['cc']['phcc'], window['cc']['cc_tshift'], 
+            window['weight']*window['weight_phcc'], window['weight']*window['weight_ccdt'])
         ax_1comp.text(max(plot_time), dist_degree, str_annot, 
             verticalalignment='center', fontsize=7)
         #ax_1comp.text(160, dist_degree, str_annot, 

@@ -1,0 +1,117 @@
+#!/bin/bash
+
+# User defined control parameters
+
+# project root directory
+base_dir=$(readlink -f ~/EastTibet_NoiseCC_FWI)
+
+# current stage and iteration number
+stage_dir=stage01.structure
+iter_num=00
+
+#------ Data directories
+# sem_config/: DATA/, setup/, initial_model/
+sem_config_dir=${base_dir}/sem_config
+# specfem_globe/: bin/xmeshfem3D,xspecfem3D
+sem_build_dir=${base_dir}/specfem3d
+# sem_utils/: utils/, utils/misfit_v0/...
+sem_utils_dir=~/seiscode/specfem3d/utils_ktao
+# mesh_REF dir
+#mesh_REF_dir=$base_dir/mesh_REF
+# events/<gcmtID>/data,dis
+data_dir=$base_dir/event_noisecc
+# $source_dir/iter??/CMTSOLUTION_updated/<gcmtID>.cmt
+#source_dir=$base_dir/backup/stage08.source
+#source_dir=$base_dir/stage00.source
+# current iteration directory: need model/ and misfit_par/
+iter_num=$(printf "%02d" $iter_num)
+iter_dir=$base_dir/$stage_dir/iter${iter_num}
+model_dir=${iter_dir}/model
+misfit_par_dir=${iter_dir}/misfit_par
+precond_dir=${iter_dir}/preconditioner # proc*_reg1_inv_hess_diag.bin
+# model_REF/: proc*_reg1_[vp0|vs0|rho0].bin
+model_REF=${iter_dir}/model_REF
+# previous iteration directory
+iter_minus_one=$(echo "$iter_num" | awk '{printf "%02d", $1-1}')
+prev_iter_dir=${base_dir}/${stage_dir}/iter${iter_minus_one}
+# sem band_code used to convert ascii outputs from REF_ENU to local_ENU e.g. in OUTPUT_FILES/XE.ES06A..BXX.semd  
+sem_band_code="BXX.semd" 
+# band code used to convert adjoint source from local_ENU to REF_ENU e.g. in adj_kernel/local_ENU/XE.ES06A..BXE.adj 
+adj_band_code="BXX.adj" 
+# randomly select stations as virtual sources
+minimum_inter_station_distance=200000 #meter
+# randomly select ~ half the virtual source stations as the common set to get oLBFGS gradient variation 
+minimum_inter_station_distance_for_common_set=300000 #meter
+
+#------ slurm jobs
+#-- cluster cpu/node
+#nproc_per_node=24 # on lonestar5
+nproc_per_node=68 # on stampede2
+#nproc_per_node=20 # on cgas
+#-- number of SEM slices
+sem_nproc=250
+#-- number of MPI processors
+#slurm_nnode=16 # lonestar5
+slurm_nnode=4 # stampede2
+slurm_nproc=250
+#-- mpi executable
+slurm_mpiexec="ibrun" # on lonestar5,stampede2
+#slurm_mpiexec="mpirun -np $slurm_nproc"
+#-- python executable
+python_exec=mypython
+#-- slurm partition
+slurm_partition="normal" # on lonestar 5
+#slurm_partition="compute" # on cgas
+#-- time limit
+slurm_timelimit_mesh=00:30:00 # mesh
+slurm_timelimit_forward=02:30:00 # forward
+slurm_timelimit_adjoint=04:30:00 # adjoint
+slurm_timelimit_misfit=05:00:00 # misfit,kernel_sum
+
+#------ hess and kernel
+##--- model names to evaluate Hess*dmodel product
+##hess_model_names="random_alpha random_beta"
+#hess_model_names="random"
+## smooth the hessian*random 
+#hess_smooth_1sigma_h=80 # horizontal smoothing 1 sigma (km)
+#hess_smooth_1sigma_v=80 # vertical smoothing 1 sigma (km)
+## waterlevel for inverse hessian diagonals 
+#hess_inverse_nbin=5000
+#hess_inverse_threshold_percentage=0.95
+#--- kernel mask around source and receiver points
+# for each event 'e': sum(Me*He, e)*dm = -1 * sum(Me*Ke, e)
+# the masked Hessian diagonals are approximated by its application on a random model perturbation dm
+# sum(Me*He, e)*dm = sum(Me*dKe, e), diag(sum(Me*He, e)) ~ |sum(Me*dKe, e)|
+source_mask_sigmaH_meter=50000
+source_mask_sigmaV_meter=50000
+#receiver_mask_sigmaH_meter=1000
+#receiver_mask_sigmaV_meter=1000
+#--- kernel smoothing
+kernel_tags=alpha_kernel,beta_kernel,rhop_kernel
+kernel_smooth_sigmaH_meter=6000,3000,6000 # horizontal smoothing 1 sigma for each kernel_tag
+kernel_smooth_sigmaV_meter=500,500,500 # vertical smoothing 1 sigma
+#--- conjugate gradient
+#cg_type=HS
+# dmodel scale factor
+dmodel_max_dlnvs=0.01
+#--- oLBFGS
+lbfgs_nstep=5
+model_tags=vp,vs,rho
+dmodel_tags=alpha_dmodel,beta_dmodel,rhop_dmodel
+dkernel_tags=alpha_dkernel,beta_dkernel,rhop_dkernel
+
+#----- update model
+#model_scale_phi_to_xi=1.5
+#model_scale_eta_to_xi=2.5
+#model_scale_rho_to_beta=0.33
+#
+#model_update_min_alpha=-0.15
+#model_update_max_alpha=0.15
+#model_update_min_beta=-0.15
+#model_update_max_beta=0.15
+#model_update_min_phi=-0.15
+#model_update_max_phi=0.15
+#model_update_min_xi=-0.15
+#model_update_max_xi=0.15
+#model_update_min_eta=0.80
+#model_update_max_eta=1.20

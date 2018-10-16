@@ -82,6 +82,7 @@ with open(fn_out, 'w') as f:
 # plot the selected data point
 plt.figure()
 plt.plot(points[:,0], points[:,1], '.')
-plt.plot(pts_select[0:n_select,0], pts_select[0:n_select,1], 'ro')
+plt.plot(pts_select[0:n_include,0], pts_select[0:n_include,1], 'ko')
+plt.plot(pts_select[n_include:n_select,0], pts_select[n_include:n_select,1], 'ro')
 plt.savefig(outfig, format='pdf')
 #plt.show()

@@ -4,10 +4,17 @@
 
 control_file=${1:?[arg]need control_file}
 event_list=${2:?[arg]need event_list}
+event_common_list=${3:?[arg]need event_common list}
 
 #====== source control_file
+if [ ! -f $control_file ] 
+then
+  echo "[ERROR] control_file does NOT exist!"
+  exit -1
+fi
 source $control_file
 event_list=$(readlink -f $event_list)
+event_common_list=$(readlink -f $event_common_list)
  
 #====== define directories
 mesh_dir=$iter_dir/mesh # DATABASES_MPI/proc*_reg1_solver_data.bin
@@ -117,7 +124,7 @@ do
     awk 'NR>=6&&NF==3{print \$0, a,b}' a=$receiver_mask_sigmaH_meter b=$receiver_mask_sigmaV_meter \$event_dir/output_kernel/sr.vtk >> \$mask_list
   fi
 
-  ${slurm_mpiexec} mypython $sem_utils_dir/structure_inversion/sem_make_mask_parallel.py \
+  ${slurm_mpiexec} ${python_exec} $sem_utils_dir/structure_inversion/sem_make_mask_parallel.py \
     $sem_config_dir/meshfem3D_files/mesh_par.py \
     $sem_nproc $mesh_dir/DATABASES_MPI \
     \$event_dir/output_kernel/kernel/sr_mask.lst \$event_dir/output_kernel/kernel/
@@ -127,45 +134,104 @@ echo "====== sum up event kernels with mask [\$(date)]"
 
 awk -F"|" 'NF&&\$1!~/#/{printf "%s/%s.%s.%s.%s/output_kernel/kernel\\n", a,\$1,\$2,\$3,\$4}' \
   a="$iter_dir" $event_list > $iter_dir/kernel_dir.list
-#awk -F"|" 'NF&&\$1!~/#/{printf "%s/%s/output_kernel/kernel\\n", a,\$9}' \
-#  a="$iter_dir" $event_list > $iter_dir/kernel_dir.list
 
 out_dir=$iter_dir/kernel_mask_sum
 mkdir \$out_dir
 
-${slurm_mpiexec} mypython $sem_utils_dir/structure_inversion/sem_sum_event_kernel_with_mask_parallel.py \
+${slurm_mpiexec} ${python_exec} $sem_utils_dir/structure_inversion/sem_sum_event_kernel_with_mask_parallel.py \
   $sem_nproc $mesh_dir/DATABASES_MPI \
   $iter_dir/kernel_dir.list $kernel_tags  mask \
   \$out_dir
+
+if [ $iter_num -ge 1 ]
+then
+  out_dir=$iter_dir/kernel_mask_sum_common
+  mkdir \$out_dir
+  
+  awk -F"|" 'NF&&\$1!~/#/{printf "%s/%s.%s.%s.%s/output_kernel/kernel\\n", a,\$1,\$2,\$3,\$4}' \
+    a="$iter_dir" $event_common_list > $iter_dir/kernel_dir_common.list
+  
+  ${slurm_mpiexec} ${python_exec} $sem_utils_dir/structure_inversion/sem_sum_event_kernel_with_mask_parallel.py \
+    $sem_nproc $mesh_dir/DATABASES_MPI \
+    $iter_dir/kernel_dir_common.list $kernel_tags  mask \
+    \$out_dir
+  
+  out_dir=$iter_dir/prev_kernel_mask_sum_common
+  mkdir \$out_dir
+  
+  awk -F"|" 'NF&&\$1!~/#/{printf "%s/%s.%s.%s.%s/output_kernel/kernel\\n", a,\$1,\$2,\$3,\$4}' \
+    a="$prev_iter_dir" $event_common_list > $iter_dir/prev_kernel_dir_common.list
+  
+  ${slurm_mpiexec} ${python_exec} $sem_utils_dir/structure_inversion/sem_sum_event_kernel_with_mask_parallel.py \
+    $sem_nproc $mesh_dir/DATABASES_MPI \
+    $iter_dir/prev_kernel_dir_common.list $kernel_tags  mask \
+    \$out_dir
+fi
 
 echo "====== smooth summed&masked event kernel [\$(date)]"
 
 mkdir $iter_dir/kernel_mask_sum_smooth
 
-${slurm_mpiexec} mypython $sem_utils_dir/meshfem3d/sem_smooth.py \
+${slurm_mpiexec} ${python_exec} $sem_utils_dir/meshfem3d/sem_smooth.py \
   $sem_config_dir/meshfem3D_files/mesh_par.py ${sem_nproc} $mesh_dir/DATABASES_MPI/ \
   $iter_dir/kernel_mask_sum/ ${kernel_tags} ${kernel_smooth_sigmaH_meter} ${kernel_smooth_sigmaV_meter} \
   $iter_dir/kernel_mask_sum_smooth/
 
-#echo ====== precondition kernel
-#
-#for kernel_tag in alpha beta phi xi eta
-#do
-#  ${slurm_mpiexec} $sem_utils_dir/bin/xsem_math \
-#    $sem_nproc $mesh_dir/DATABASES_MPI \
-#    \$out_dir \${kernel_tag}_kernel \
-#    $precond_dir inv_hess_diag \
-#    "mul" \
-#    \$out_dir \${kernel_tag}_kernel_precond
-#done
-#
-#model_tags=alpha_kernel_precond,beta_kernel_precond,phi_kernel_precond,xi_kernel_precond,eta_kernel_precond
-#
-#$slurm_mpiexec $sem_utils_dir/bin/xsem_smooth \
-#  $sem_nproc $mesh_dir/DATABASES_MPI \
-#  \$out_dir \${model_tags} \
-#  $kernel_smooth_1sigma_h $kernel_smooth_1sigma_v \
-#  \$out_dir "_smooth"
+if [ $iter_num -ge 1 ]
+then
+
+  mkdir $iter_dir/kernel_mask_sum_smooth_common
+  
+  ${slurm_mpiexec} ${python_exec} $sem_utils_dir/meshfem3d/sem_smooth.py \
+    $sem_config_dir/meshfem3D_files/mesh_par.py ${sem_nproc} $mesh_dir/DATABASES_MPI/ \
+    $iter_dir/kernel_mask_sum_common/ ${kernel_tags} ${kernel_smooth_sigmaH_meter} ${kernel_smooth_sigmaV_meter} \
+    $iter_dir/kernel_mask_sum_smooth_common/
+  
+  mkdir $iter_dir/prev_kernel_mask_sum_smooth_common
+  
+  ${slurm_mpiexec} ${python_exec} $sem_utils_dir/meshfem3d/sem_smooth.py \
+    $sem_config_dir/meshfem3D_files/mesh_par.py ${sem_nproc} $mesh_dir/DATABASES_MPI/ \
+    $iter_dir/prev_kernel_mask_sum_common/ ${kernel_tags} ${kernel_smooth_sigmaH_meter} ${kernel_smooth_sigmaV_meter} \
+    $iter_dir/prev_kernel_mask_sum_smooth_common/
+fi
+
+echo "====== kernel precondition"
+
+if [ $iter_num -eq 0 ]
+then
+  mkdir $iter_dir/dmodel
+  ${slurm_mpiexec} ${python_exec} $sem_utils_dir/structure_inversion/sem_get_dmodel_by_steepest_descent.py \
+    ${sem_nproc} $mesh_dir/DATABASES_MPI/ \
+    $iter_dir/kernel_mask_sum_smooth $kernel_tags \
+    $steepest_descent_maxabs_dmodel \
+    $iter_dir/dmodel $dmodel_tags
+fi
+
+if [ $iter_num -ge 1 ]
+then
+  #-- get dkernel
+  mkdir $iter_dir/dkernel_mask_sum_smooth_common
+  ${slurm_mpiexec} ${python_exec} $sem_utils_dir/structure_inversion/sem_math_op.py \
+    ${sem_nproc} \
+    $iter_dir/kernel_mask_sum_smooth_common  $kernel_tags \
+    $iter_dir/prev_kernel_mask_sum_smooth_common  $kernel_tags \
+    "V1 - V2" \
+    $iter_dir/dkernel_mask_sum_smooth_common/ \
+    $dkernel_tags    
+
+  #-- oLBFGS
+  n0=$(echo $iter_num $lbfgs_nstep | awk '{ if($1<=$2){print 0}; if($1>$2){print $1-$2} }')
+  n1=$(echo $iter_num | awk '{print $1-1 }')
+  seq \$n0 \$n1 | awk '{printf "%s/%s/iter%02d/dmodel %s/%s/iter%02d/dkernel_mask_sum_smooth_common\n",a,b,\$1,a,b,\$1+1}' \
+    a=${base_dir} b=${stage_dir} > dmodel_dkernel_common_dir.lst
+  
+  mkdir $iter_dir/dmodel
+  ${slurm_mpiexec} ${python_exec} $sem_utils_dir/structure_inversion/sem_get_dmodel_by_oLBFGS.py \
+    ${sem_nproc} $mesh_dir/DATABASES_MPI/ \
+    $iter_dir/kernel_mask_sum_smooth $kernel_tags \
+    $iter_dir/dmodel_dkernel_common_dir.lst $dmodel_tags $dkernel_tags \
+    $iter_dir/dmodel
+fi
 
 echo
 echo "Done: JOB_ID=\${SLURM_JOB_ID} [\$(date)]"
