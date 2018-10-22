@@ -13,10 +13,10 @@ next_iter_dir=$base_dir/$stage_dir/iter${iter_plus_one}
 mkdir -p $next_iter_dir
 cd $next_iter_dir
 
-ln -s $iter_dir/STATIONS.REF_ENU.subset.new STATIONS.REF_ENU.subset
-ln -s $iter_dir/STATIONS.REF_ENU.subset.include STATIONS.REF_ENU.common
-awk '$1!~/#/{printf "%s.%s\n",$1,$2}' STATIONS.REF_ENU.subset > grep.f
-grep -f grep.f $data_dir/data/event.txt > $next_iter_dir/event.txt
+#ln -s $iter_dir/STATIONS.REF_ENU.subset.new STATIONS.REF_ENU.subset
+#ln -s $iter_dir/STATIONS.REF_ENU.subset.include STATIONS.REF_ENU.common
+#awk '$1!~/#/{printf "%s.%s\n",$1,$2}' STATIONS.REF_ENU.subset > grep.f
+#grep -f grep.f $data_dir/data/event.txt > $next_iter_dir/event.txt
 
 cp -a $iter_dir/misfit_par $next_iter_dir/
 

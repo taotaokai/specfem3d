@@ -2165,7 +2165,7 @@ class Misfit(object):
             'CC0': CC0, 'CCmax': CCmax,
             'AR0': AR0, 'ARmax': ARmax,
             'Nw':Nw, 'Aw':Aw }
-        if misfit_type == 'phcc':
+        if misfit_type in ['phcc','phcc_ccdt',]:
           cc_dict['phcc'] = phcc
         window['quality'] = quality_dict
         window['cc'] = cc_dict
@@ -5458,7 +5458,7 @@ class Misfit(object):
         ##annotate station names 
         str_annot = ' %s (%.3f,%.3f,%.1f)' % (
           station_id, window['cc']['CC0'], window['cc']['cc_tshift'], window['weight'])
-        if window['misfit_type'] == 'phcc' or window['misfit_type'] == 'phcc_ccdt':
+        if window['misfit_type'] == 'phcc':
           str_annot = ' %s (%.2f,%.2f,%.1f)' % (
             station_id, window['cc']['phcc'], window['cc']['cc_tshift'], window['weight'])
         if window['misfit_type'] == 'phcc_ccdt':

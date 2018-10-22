@@ -28,3 +28,4 @@ ${python_exec} $sem_utils_dir/structure_inversion/random_select_stations_with_in
 
 awk '$1!~/#/{printf "%s.%s\n",$1,$2}' STATIONS.REF_ENU.subset > grep.f
 grep -f grep.f $data_dir/data/event.txt > event.txt
+rm grep.f

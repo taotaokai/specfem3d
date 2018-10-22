@@ -17,6 +17,13 @@ with open(fn_all, 'r') as f:
   lines_all = [ l for l in f.readlines() if not l.startswith('#') ]
 split_lines = [ l.split() for l in lines_all ]
 net_sta_all = [ l[0]+"."+l[1] for l in split_lines ]
+y_all = np.array([ float(l[2]) for l in split_lines ])
+x_all = np.array([ float(l[3]) for l in split_lines ])
+npoint = len(x_all)
+points_all = np.zeros((npoint,2))
+points_all[:,0] = x_all
+points_all[:,1] = y_all
+
 # read points to exclude
 with open(fn_exclude, 'r') as f:
   lines = [ l for l in f.readlines() if not l.startswith('#') ]
@@ -81,7 +88,7 @@ with open(fn_out, 'w') as f:
 
 # plot the selected data point
 plt.figure()
-plt.plot(points[:,0], points[:,1], '.')
+plt.plot(points_all[:,0], points_all[:,1], '.')
 plt.plot(pts_select[0:n_include,0], pts_select[0:n_include,1], 'ko')
 plt.plot(pts_select[n_include:n_select,0], pts_select[n_include:n_select,1], 'ro')
 plt.savefig(outfig, format='pdf')

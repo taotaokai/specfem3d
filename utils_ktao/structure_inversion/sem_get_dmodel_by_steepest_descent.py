@@ -22,7 +22,7 @@ dmodel_tags = str(sys.argv[7]) # e.g. alpha_dmodel,beta_dmodel,rhop_dmodel
 kernel_tags = kernel_tags.split(',')
 dmodel_tags = dmodel_tags.split(',')
 nmodel = len(dmodel_tags)
-if len(kernel_tags) != nmodel
+if len(kernel_tags) != nmodel:
   print("ERROR: kernel_tags, dmodel_tags must have the same length")
   sys.exit(-1)
 
