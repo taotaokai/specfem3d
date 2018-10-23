@@ -110,6 +110,17 @@ def sem_mesh_read(mesh_file):
   iglob_elem = mesh_data['ibool'][MIDX,MIDY,MIDZ,:] - 1
   mesh_data['xyz_elem'] = mesh_data['xyz_glob'][:,iglob_elem]
 
+# nspec = int(mesh_data['nspec'])
+#  for ispec in range(nspec):
+#    for i in range(NGLLX):
+#      for j in range(NGLLY):
+#        for k in range(NGLLZ):
+#          iglob = mesh_data['ibool'][i,j,k,ispec] - 1
+#          xyz_gll[0,i,j,k,ispec] = mesh_data['x'][iglob]
+#          xyz_gll[1,i,j,k,ispec] = mesh_data['y'][iglob]
+#          xyz_gll[2,i,j,k,ispec] = mesh_data['z'][iglob]
+#  xyz_gll = np.zeros((3,NGLLX,NGLLY,NGLLZ,nspec))
+
   return mesh_data
 
 
@@ -132,15 +143,67 @@ def sem_mesh_get_vol_gll(mesh_data):
 
   return vol_gll
 
-# nspec = int(mesh_data['nspec'])
-#  for ispec in range(nspec):
-#    for i in range(NGLLX):
-#      for j in range(NGLLY):
-#        for k in range(NGLLZ):
-#          iglob = mesh_data['ibool'][i,j,k,ispec] - 1
-#          xyz_gll[0,i,j,k,ispec] = mesh_data['x'][iglob]
-#          xyz_gll[1,i,j,k,ispec] = mesh_data['y'][iglob]
-#          xyz_gll[2,i,j,k,ispec] = mesh_data['z'][iglob]
-#
-#
-#  xyz_gll = np.zeros((3,NGLLX,NGLLY,NGLLZ,nspec))
+#///////////////////////////////////////////////////
+def _anchor_index_hex8():
+  """ get the index of anchor nodes for a 8-node element
+  anchor nodes are located on the eight conrers.
+  """
+  n = NGLL-1
+  iax = np.array([ 0, n, n, 0, 0, n, n, 0], dtype='i4')
+  iay = np.array([ 0, 0, n, n, 0, 0, n, n], dtype='i4')
+  iaz = np.array([ 0, 0, 0, 0, n, n, n, n], dtype='i4')
+
+  return iax, iay, iaz
+
+#///////////////////////////////////////////////////
+def locate_points_hex8(mesh_data, xyz):
+  """ locate points in the SEM mesh. 
+  The anchor points are located on the 8 corners of each element.
+  xyz(3,n)
+  """
+  from scipy import spatial
+  from jacobian_hex8 import xyz2cube_bounded_hex8
+
+  nspec = mesh_data['nspec']
+  ibool = mesh_data['ibool']
+  xyz_glob = mesh_data['xyz_glob']
+  xyz_elem = mesh_data['xyz_elem']
+
+  #--- kdtree search nearby elements around each target point
+  tree_elem = spatial.cKDTree(np.column_stack(
+    (xyz_elem[0,:],xyz_elem[1,:],xyz_elem[2,:])))
+
+  tree_xyz = spatial.cKDTree(np.column_stack(
+    (xyz[0,:],xyz[1,:],xyz[2,:])))
+  
+  # determine maximum search radius
+  n = NGLL - 1
+  max_element_size = 0.0 
+  for ispec in range(nspec):
+    iglob1 = ibool[0,0,0,ispec]-1
+    iglob2 = ibool[n,n,n,ispec]-1
+    xyz1 = xyz_glob[:,iglob1]
+    xyz2 = xyz_glob[:,iglob2]
+    max_element_size = max(max_element_size, sum((xyz1-xyz2)**2)**0.5)
+
+  neighbor_lists = tree_xyz.query_ball_tree(tree_elem, 1.5*max_element_size)
+
+  #--- loop over each point, get the location info 
+  iax, iay, iaz = _anchor_index_hex8()
+  for ipoint in range(xyz.shape[1]):
+    loc_data[ipoint] = {}
+    loc_data[ipoint]['misloc'] = np.inf
+    loc_data[ipoint]['is_inside'] = False
+    if not neigbhor_lists[ipoint]:
+      continue
+    for ispec in neighbor_lists[ipoint]:
+      iglob = ibool[iax,iay,iaz,ispec] - 1
+      xyz_anchor = xyz_glob[:,iglob]
+      uvw, misloc1, is_inside = xyz2cube_bounded_hex8(xyz_anchor, xyz[:,ipoint])
+      if misloc1 < loc_data[ipoint]['misloc']:
+        loc_data[ipoint]['uvw'] = uvw
+        loc_data[ipoint]['misloc'] = misloc
+        loc_data[ipoint]['ispec'] = ispec
+        loc_data[ipoint]['is_inside'] = is_inside
+
+  return loc_data
