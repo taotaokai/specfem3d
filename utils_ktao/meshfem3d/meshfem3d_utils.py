@@ -133,8 +133,8 @@ def sem_mesh_get_vol_gll(mesh_data):
 
   #--- quadrature weights on GLL points
   zx, wx = zwgljd(NGLLX,GAUSSALPHA,GAUSSBETA)
-  zy, wy = zwgljd(NGLLX,GAUSSALPHA,GAUSSBETA)
-  zz, wz = zwgljd(NGLLX,GAUSSALPHA,GAUSSBETA)
+  zy, wy = zwgljd(NGLLY,GAUSSALPHA,GAUSSBETA)
+  zz, wz = zwgljd(NGLLZ,GAUSSALPHA,GAUSSBETA)
 
   wgll_cube = wx.reshape((NGLLX,1,1))*wy.reshape((1,NGLLY,1))*wx.reshape((1,1,NGLLZ))
 
@@ -156,7 +156,7 @@ def _anchor_index_hex8():
   return iax, iay, iaz
 
 #///////////////////////////////////////////////////
-def locate_points_hex8(mesh_data, xyz):
+def sem_locate_points_hex8(mesh_data, xyz):
   """ locate points in the SEM mesh. 
   The anchor points are located on the 8 corners of each element.
   xyz(3,n)
@@ -190,13 +190,19 @@ def locate_points_hex8(mesh_data, xyz):
 
   #--- loop over each point, get the location info 
   iax, iay, iaz = _anchor_index_hex8()
+  zxgll, wx = zwgljd(NGLLX,GAUSSALPHA,GAUSSBETA)
+  zygll, wy = zwgljd(NGLLY,GAUSSALPHA,GAUSSBETA)
+  zzgll, wz = zwgljd(NGLLZ,GAUSSALPHA,GAUSSBETA)
   for ipoint in range(xyz.shape[1]):
     loc_data[ipoint] = {}
     loc_data[ipoint]['misloc'] = np.inf
     loc_data[ipoint]['is_inside'] = False
-    if not neigbhor_lists[ipoint]:
-      continue
-    for ispec in neighbor_lists[ipoint]:
+    if not neigbhor_lists[ipoint]: continue
+    # sort distance, start from the neareast element
+    ispec_list = neighbor_lists[ipoint]
+    dist2 = np.sum((xyz_elem[:,ispec_list] - xyz[:,ipoint].reshape((3,1)))**2, axis=0)
+    idx = np.argsort(dist2)
+    for ispec in ispec_list[idx]:
       iglob = ibool[iax,iay,iaz,ispec] - 1
       xyz_anchor = xyz_glob[:,iglob]
       uvw, misloc1, is_inside = xyz2cube_bounded_hex8(xyz_anchor, xyz[:,ipoint])
@@ -205,5 +211,11 @@ def locate_points_hex8(mesh_data, xyz):
         loc_data[ipoint]['misloc'] = misloc
         loc_data[ipoint]['ispec'] = ispec
         loc_data[ipoint]['is_inside'] = is_inside
+      if is_inside: break
+    if 'uvw' in loc_data[ipoint]:
+      hlagx = lagrange_poly(uvw[0],zxgll)
+      hlagy = lagrange_poly(uvw[1],zygll)
+      hlagz = lagrange_poly(uvw[2],zzgll)
+      loc_data[ipoint]['lagrange'] = hlagx[:,None,None]*hlagy[None,:,None]*hlagz[None,None,:]
 
   return loc_data

@@ -13,8 +13,6 @@ import matplotlib
 matplotlib.use("pdf")
 import matplotlib.pyplot as plt
 
-
-
 #====== parameters
 mesh_par_file = str(sys.argv[1])
 
