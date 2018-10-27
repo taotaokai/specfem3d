@@ -84,7 +84,9 @@ subroutine jacobian_hex8(xyz_anchor, uvw, xyz, DuvwDxyz)
 ! the shape the element is defined by the anchor points (xyz_anchor)
 !
 !-input
-! xyz_anchor(3,8): xyz of anchor points
+! xyz_anchor(3,8): xyz of anchor points, the order of the 8 nodes must be from
+! subroutine anchor_index_hex8()
+!
 ! uvw(3): local coordinate 
 !
 !-output
@@ -199,3 +201,33 @@ subroutine jacobian_hex8(xyz_anchor, uvw, xyz, DuvwDxyz)
   DuvwDxyz = DuvwDxyz/jacobian
 
 end subroutine jacobian_hex8
+
+!///////////////////////////////////////////////////////////////////////////////
+
+subroutine anchor_index_hex8(NGLLX,NGLLY,NGLLZ,iax,iay,iaz)
+! index of the anchor nodes as a 8-node element in a SEM element of NGLLX,NGLLY,NGLLZ
+! nodes   
+!
+!-input
+! NGLLX,NGLLY,NGLLZ
+!
+!-output
+! iax,iay,iaz(3): index of the anchor nodes on x,y,z axes of the SEM element
+
+  implicit none
+
+  ! input/output
+  integer, intent(in) :: NGLLX,NGLLY,NGLLZ
+  integer, intent(out) :: iax(8), iay(8), iaz(8)
+
+  integer :: nx, ny, nz
+
+  nx = NGLLX -1
+  ny = NGLLY -1
+  nz = NGLLZ -1
+
+  iax = (/0, nx, nx,  0,  0, nx, nx,  0/)
+  iay = (/0,  0, ny, ny,  0,  0, ny, ny/)
+  iaz = (/0,  0,  0,  0, nz, nz, nz, nz/)
+ 
+end subroutine anchor_index_hex8

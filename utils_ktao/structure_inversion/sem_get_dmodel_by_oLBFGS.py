@@ -55,6 +55,7 @@ for imodel in range(nmodel):
     kernel[imodel,:,:,:,:] = np.reshape(f.read_ints(dtype='f4'), gll_dims, order='F')
 
 #--- two-loop LBFGS
+# Nicol N. Schraudolph et al., 2007
 dmodel_dkernel = np.zeros(nstep)
 dkernel_dkernel = np.zeros(nstep)
 alpha = np.zeros(nstep)
@@ -69,6 +70,7 @@ for istep in range(nstep-1,-1,-1):
       dmodel[imodel,:,:,:,:] = np.reshape(f.read_ints(dtype='f4'), gll_dims, order='F')
     dkernel_file = "%s/proc%06d_%s.bin"%(dkernel_dirs[istep], mpi_rank, dkernel_tags[imodel])
     with FortranFile(dkernel_file, 'r') as f:
+      #NOTE -1* is applied because we are maximizing the objective function 
       dkernel[imodel,:,:,:,:] = -1*np.reshape(f.read_ints(dtype='f4'), gll_dims, order='F')
 
   dmodel_kernel_local = np.sum(dmodel * kernel * vol_gll)

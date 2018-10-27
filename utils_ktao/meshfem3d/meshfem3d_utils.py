@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+import sys
 import numpy as np
 
 #///////////////////////////////////////////////
@@ -144,25 +145,14 @@ def sem_mesh_get_vol_gll(mesh_data):
   return vol_gll
 
 #///////////////////////////////////////////////////
-def _anchor_index_hex8():
-  """ get the index of anchor nodes for a 8-node element
-  anchor nodes are located on the eight conrers.
-  """
-  n = NGLL-1
-  iax = np.array([ 0, n, n, 0, 0, n, n, 0], dtype='i4')
-  iay = np.array([ 0, 0, n, n, 0, 0, n, n], dtype='i4')
-  iaz = np.array([ 0, 0, 0, 0, n, n, n, n], dtype='i4')
-
-  return iax, iay, iaz
-
-#///////////////////////////////////////////////////
 def sem_locate_points_hex8(mesh_data, xyz):
   """ locate points in the SEM mesh. 
   The anchor points are located on the 8 corners of each element.
   xyz(3,n)
   """
   from scipy import spatial
-  from jacobian_hex8 import xyz2cube_bounded_hex8
+  from gll_library import zwgljd, lagrange_poly
+  from jacobian_hex8 import xyz2cube_bounded_hex8, anchor_index_hex8
 
   nspec = mesh_data['nspec']
   ibool = mesh_data['ibool']
@@ -177,11 +167,10 @@ def sem_locate_points_hex8(mesh_data, xyz):
     (xyz[0,:],xyz[1,:],xyz[2,:])))
   
   # determine maximum search radius
-  n = NGLL - 1
   max_element_size = 0.0 
   for ispec in range(nspec):
     iglob1 = ibool[0,0,0,ispec]-1
-    iglob2 = ibool[n,n,n,ispec]-1
+    iglob2 = ibool[-1,-1,-1,ispec]-1
     xyz1 = xyz_glob[:,iglob1]
     xyz2 = xyz_glob[:,iglob2]
     max_element_size = max(max_element_size, sum((xyz1-xyz2)**2)**0.5)
@@ -189,33 +178,36 @@ def sem_locate_points_hex8(mesh_data, xyz):
   neighbor_lists = tree_xyz.query_ball_tree(tree_elem, 1.5*max_element_size)
 
   #--- loop over each point, get the location info 
-  iax, iay, iaz = _anchor_index_hex8()
-  zxgll, wx = zwgljd(NGLLX,GAUSSALPHA,GAUSSBETA)
-  zygll, wy = zwgljd(NGLLY,GAUSSALPHA,GAUSSBETA)
-  zzgll, wz = zwgljd(NGLLZ,GAUSSALPHA,GAUSSBETA)
-  for ipoint in range(xyz.shape[1]):
+  iax, iay, iaz = anchor_index_hex8(NGLLX,NGLLY,NGLLZ)
+  xigll, wx = zwgljd(NGLLX,GAUSSALPHA,GAUSSBETA)
+  yigll, wy = zwgljd(NGLLY,GAUSSALPHA,GAUSSBETA)
+  zigll, wz = zwgljd(NGLLZ,GAUSSALPHA,GAUSSBETA)
+
+  npoints = xyz.shape[1]
+  loc_data = [None] * npoints
+  for ipoint in range(npoints):
     loc_data[ipoint] = {}
     loc_data[ipoint]['misloc'] = np.inf
     loc_data[ipoint]['is_inside'] = False
-    if not neigbhor_lists[ipoint]: continue
+    if not neighbor_lists[ipoint]: continue
     # sort distance, start from the neareast element
-    ispec_list = neighbor_lists[ipoint]
+    ispec_list = np.array(neighbor_lists[ipoint]) # covnert list to numpy array to have index slicing
     dist2 = np.sum((xyz_elem[:,ispec_list] - xyz[:,ipoint].reshape((3,1)))**2, axis=0)
     idx = np.argsort(dist2)
     for ispec in ispec_list[idx]:
       iglob = ibool[iax,iay,iaz,ispec] - 1
       xyz_anchor = xyz_glob[:,iglob]
-      uvw, misloc1, is_inside = xyz2cube_bounded_hex8(xyz_anchor, xyz[:,ipoint])
-      if misloc1 < loc_data[ipoint]['misloc']:
+      uvw, misloc, is_inside = xyz2cube_bounded_hex8(xyz_anchor, xyz[:,ipoint])
+      if misloc < loc_data[ipoint]['misloc']:
         loc_data[ipoint]['uvw'] = uvw
         loc_data[ipoint]['misloc'] = misloc
         loc_data[ipoint]['ispec'] = ispec
         loc_data[ipoint]['is_inside'] = is_inside
       if is_inside: break
     if 'uvw' in loc_data[ipoint]:
-      hlagx = lagrange_poly(uvw[0],zxgll)
-      hlagy = lagrange_poly(uvw[1],zygll)
-      hlagz = lagrange_poly(uvw[2],zzgll)
+      hlagx = lagrange_poly(xigll, uvw[0])
+      hlagy = lagrange_poly(yigll, uvw[1])
+      hlagz = lagrange_poly(zigll, uvw[2])
       loc_data[ipoint]['lagrange'] = hlagx[:,None,None]*hlagy[None,:,None]*hlagz[None,None,:]
 
   return loc_data

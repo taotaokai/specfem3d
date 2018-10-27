@@ -59,8 +59,8 @@ ref_ellps =  par.mesh_ref_ellps
 ref_rotmat = rotmat_enu_to_ecef(ref_lon,ref_lat)
 
 #--- create slice grid
-grd_lon1 = np.linspace(min_lon, max_lon, dlon)
-grd_lat1 = np.linspace(min_lat, max_lat, dlat)
+grd_lon1 = np.linspace(min_lon, max_lon, nlon)
+grd_lat1 = np.linspace(min_lat, max_lat, nlat)
 grd_lon2, grd_lat2 = np.meshgrid(grd_lon1, grd_lat1)
 grd_alt2 = np.ones(grd_lon2.shape) * -1000.0 * depth_km
 # convert (lon,lat,alt) to ECEF
@@ -69,7 +69,7 @@ lla = pyproj.Proj(proj='latlong', ellps=ref_ellps)
 x0, y0, z0 = pyproj.transform(lla, ecef, ref_lon, ref_lat, ref_alt)
 xx, yy, zz = pyproj.transform(lla, ecef, grd_lon2, grd_lat2, grd_alt2)
 # transform from ECEF to REF_ENU
-dxyz = np.vstack(xx.ravel()-x0, yy.ravel()-y0, zz.ravel()-z0)
+dxyz = np.vstack((xx.ravel()-x0, yy.ravel()-y0, zz.ravel()-z0))
 grd_enu = np.dot(np.transpose(ref_rotmat), dxyz)
 npoints = grd_enu.shape[1]
 
@@ -101,7 +101,7 @@ for iproc in range(mpi_rank,nproc,mpi_size):
     model_tag = model_names[imodel]
     model_file = "%s/proc%06d_%s.bin"%(model_dir, iproc, model_tag)
     with FortranFile(model_file, 'r') as f:
-      # note: must use fortran convention when reshape to N-D array!!! 
+      # note: must use fortran convention when reshape to N-D array!!!
       model_gll[imodel,:,:,:,:] = np.reshape(f.read_ints(dtype='f4'), gll_dims, order='F')
 
   # locate each points
@@ -144,8 +144,8 @@ else:
   dataset.createDimension('longitude',nlon)
   dataset.createDimension('latitude',nlat)
   #
-  longitudes = dataset.createVariable('longitude', np.float32, ('lon',))
-  latitudes = dataset.createVariable('latitude', np.float32, ('lat',))
+  longitudes = dataset.createVariable('longitude', np.float32, ('longitude',))
+  latitudes = dataset.createVariable('latitude', np.float32, ('latitude',))
   longitudes.units = 'degree_east'
   latitudes.units = 'degree_north'
   longitudes[:] = grd_lon1
