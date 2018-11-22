@@ -1,0 +1,11 @@
+# List files that should not be committed
+.*swp
+.*swo
+.*swn
+*~
+
+#
+*.so
+*.so.dSYM
+*/__pycache__
+old

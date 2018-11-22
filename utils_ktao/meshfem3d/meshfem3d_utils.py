@@ -137,10 +137,11 @@ def sem_mesh_get_vol_gll(mesh_data):
   zy, wy = zwgljd(NGLLY,GAUSSALPHA,GAUSSBETA)
   zz, wz = zwgljd(NGLLZ,GAUSSALPHA,GAUSSBETA)
 
-  wgll_cube = wx.reshape((NGLLX,1,1))*wy.reshape((1,NGLLY,1))*wx.reshape((1,1,NGLLZ))
+  #wgll_cube = wx.reshape((NGLLX,1,1)) * wy.reshape((1,NGLLY,1)) * wz.reshape((1,1,NGLLZ))
 
   #--- jacobian * gll_quad_weights
-  vol_gll = mesh_data['jacobian']*wgll_cube.reshape((NGLLX,NGLLY,NGLLZ,1))
+  #vol_gll = mesh_data['jacobian'] * wgll_cube.reshape((NGLLX,NGLLY,NGLLZ,1))
+  vol_gll = mesh_data['jacobian'] * wx[NGLLX,None,None,None] * wy[None,NGLLY,None,None] * wz[None,None,NGLLZ,None]
 
   return vol_gll
 
