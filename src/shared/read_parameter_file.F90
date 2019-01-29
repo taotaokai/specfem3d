@@ -881,6 +881,10 @@
       IMODEL = IMODEL_IPATI_WATER
     case ('gll')
       IMODEL = IMODEL_GLL
+!! ktao: anisotropic model
+    case ('gll_aniso')
+      IMODEL = IMODEL_GLL_ANISO
+      ANISOTROPY = .true.
     case ('salton_trough')
       IMODEL = IMODEL_SALTON_TROUGH
     case ('tomo')

@@ -12,7 +12,7 @@ src/specfem3D/get_force.f90
 #====== Swap the order in reading stnm and netwk in STATIONS file  
 
 src/specfem3D/locate_receivers.f90 
-  - line 162-165: change the order between station_name and network_name 
+  - line 179-182: change the order between station_name and network_name 
 
 #====== Fix the GLL model path to "DATA/GLL"
 
@@ -27,11 +27,11 @@ src/generate_databases/get_model.F90
 src/generate_databases/model_gll_aniso.f90 
   - add this new subroutine to read in anisotropic model
 
+src/generate_databases/generate_databases_par.F90
+  - add entries for IMODEL_GLL_ANISO at lines:40
+
 src/generate_databases/get_model.F90 
   - add entries for IMODEL_GLL_ANISO at lines:484, 653, 688,722, 
-
-src/generate_databases/model_gll.f90 
-  - hardwire gll path to DATA/GLL at line 49
 
 src/generate_databases/read_parameters.f90 
   - add entry for IMODEL_GLL_ANISO at line 96
@@ -44,5 +44,8 @@ src/shared/read_parameter_file.F90
 
 src/specfem3D/initialize_simulation.F90 
   - add entry for gll_aniso at line 101
+
+setup/constants.h.in
+  - add entry for gll_aniso at line 550
 
 #====== [OBSOLETE] src/specfem3D/setup_sources_receivers.f90 - correct computation on force source_array at lines 675-726. This bug is already fixed in the CIG repo as of 2018-07-10.

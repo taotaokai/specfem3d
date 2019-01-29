@@ -28,7 +28,7 @@
   subroutine get_model(myrank)
 
   use generate_databases_par, only: IMODEL, &
-    IMODEL_DEFAULT,IMODEL_GLL,IMODEL_1D_PREM,IMODEL_1D_CASCADIA,IMODEL_1D_SOCAL, &
+    IMODEL_DEFAULT,IMODEL_GLL,IMODEL_GLL_ANISO,IMODEL_1D_PREM,IMODEL_1D_CASCADIA,IMODEL_1D_SOCAL, &
     IMODEL_SALTON_TROUGH,IMODEL_TOMO,IMODEL_USER_EXTERNAL,IMODEL_IPATI,IMODEL_IPATI_WATER, &
     IMODEL_COUPLED, &
     IDOMAIN_ACOUSTIC,IDOMAIN_ELASTIC,IDOMAIN_POROELASTIC, &
@@ -411,9 +411,10 @@
                               c34,c35,c36,c44,c45,c46,c55,c56,c66, &
                               ANISOTROPY)
 
-  use generate_databases_par, only: IMODEL,IMODEL_DEFAULT,IMODEL_GLL,IMODEL_1D_PREM,IMODEL_1D_CASCADIA,IMODEL_1D_SOCAL, &
+  use generate_databases_par, only: IMODEL,IMODEL_DEFAULT,IMODEL_GLL,IMODEL_GLL_ANISO, &
+    IMODEL_1D_PREM,IMODEL_1D_CASCADIA,IMODEL_1D_SOCAL, &
     IMODEL_SALTON_TROUGH,IMODEL_TOMO,IMODEL_USER_EXTERNAL,IMODEL_IPATI,IMODEL_IPATI_WATER, &
-    IMODEL_1D_PREM_PB,IMODEL_GLL, IMODEL_SEP,IMODEL_COUPLED, &
+    IMODEL_1D_PREM_PB, IMODEL_SEP,IMODEL_COUPLED, &
     IDOMAIN_ACOUSTIC,IDOMAIN_ELASTIC,ATTENUATION_COMP_MAXIMUM
 
   use create_regions_mesh_ext_par
@@ -479,7 +480,9 @@
   ! selects chosen velocity model
   select case (IMODEL)
 
-  case (IMODEL_DEFAULT,IMODEL_GLL,IMODEL_IPATI,IMODEL_IPATI_WATER, IMODEL_SEP)
+  !! 2018-04-28 ktao: add IMODEL_GLL_ANISO
+  !!case (IMODEL_DEFAULT,IMODEL_GLL,IMODEL_IPATI,IMODEL_IPATI_WATER, IMODEL_SEP)
+  case (IMODEL_DEFAULT,IMODEL_GLL,IMODEL_GLL_ANISO,IMODEL_IPATI,IMODEL_IPATI_WATER, IMODEL_SEP)
     ! material values determined by mesh properties
     call model_default(materials_ext_mesh,nmat_ext_mesh, &
                        undef_mat_prop,nundefMat_ext_mesh, &
@@ -644,7 +647,9 @@
   end select
 
   ! adds anisotropic default model
-  if (ANISOTROPY) then
+  !! 2018-04-28 ktao do not call model_aniso if IMODEL_GLL_ANISO is selected
+  !!if (ANISOTROPY) then
+  if (ANISOTROPY .and. (IMODEL/=IMODEL_GLL_ANISO)) then
     call model_aniso(iflag_aniso,rho,vp,vs, &
                     c11,c12,c13,c14,c15,c16, &
                     c22,c23,c24,c25,c26,c33, &
@@ -677,7 +682,10 @@
 
 ! reads in material parameters from external binary files
 
-  use generate_databases_par, only: IMAIN, IMODEL, IMODEL_GLL,IMODEL_IPATI,IMODEL_IPATI_WATER, IMODEL_SEP, ADIOS_FOR_MESH
+  !! ktao : add IMODEL_GLL_ANISO
+  !!use generate_databases_par, only: IMAIN, IMODEL, IMODEL_GLL,IMODEL_IPATI,IMODEL_IPATI_WATER, IMODEL_SEP, ADIOS_FOR_MESH
+  use generate_databases_par, only: IMAIN, IMODEL, IMODEL_GLL,IMODEL_GLL_ANISO, &
+    IMODEL_IPATI,IMODEL_IPATI_WATER, IMODEL_SEP, ADIOS_FOR_MESH
 
   use create_regions_mesh_ext_par
 
@@ -709,6 +717,18 @@
       ! KT KT remove the argument LOCAL_PATH
       !call model_gll(myrank,nspec,LOCAL_PATH)
       call model_gll(myrank,nspec)
+    endif
+
+  !! 2018-04-28 ktao added
+  case (IMODEL_GLL_ANISO)
+    ! note:
+    ! import the model from files in SPECFEM format
+    ! note that those those files should be saved in LOCAL_PATH
+    if (ADIOS_FOR_MESH) then
+      !!call model_gll_aniso_adios(myrank,nspec,LOCAL_PATH)
+      stop 'get_model.F90,727 : model_gll_aniso_adios not implemented.'
+    else
+      call model_gll_aniso(myrank,nspec)
     endif
 
   case (IMODEL_IPATI)

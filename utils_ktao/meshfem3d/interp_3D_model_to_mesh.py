@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """ Interpolate 3D model onto mesh grids
 
-The 3D model file: lat lon dep vp vs
+The 3D model file: lat lon dep vp vs rho
 
 """
 import sys

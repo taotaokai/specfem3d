@@ -2,14 +2,14 @@
 
 # setup mesh folders, generate the batch script to run SEM meshfem3D
 
-proc_per_node=20
-
 #====== command line args
 run_dir=${1:?[arg]need run_dir(for all output)}
 par_dir=${2:?[arg]need par_dir(for Par_file,STATIONS,*SOLUTION)}
 mesh_dir=${3:?[arg]need mesh_dir(for DATABASES/*)}
 sem_dir=${4:?[arg]need sem_dir(for code, DATA/*)}
 mpiexec=${5:?[arg]need mpiexec (e.g. ibrun or mpirun)}
+proc_per_node=${6:?[arg]need proc_per_node (e.g. 68 for stampede2 KNL, 20 for cgas)}
+partition_name=${7:-normal}
 
 if [ -d "$run_dir" ]
 then
@@ -97,7 +97,7 @@ cat <<EOF > $run_dir/syn.job
 #SBATCH -N $nnode
 #SBATCH -n $nproc
 #SBATCH -t 01:00:00
-##SBATCH -p normal
+#SBATCH -p ${partition_name}
 ##SBATCH --mail-user=kai.tao@utexas.edu
 ##SBATCH --mail-type=begin
 ##SBATCH --mail-type=end

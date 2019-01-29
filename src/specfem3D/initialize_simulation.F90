@@ -100,6 +100,9 @@
     write(IMAIN,'(a)',advance='yes') '  default '
     case (IMODEL_GLL)
     write(IMAIN,'(a)',advance='yes') '  gll'
+    !! 2018-04-28 ktao : add IMODEL_GLL_ANISO
+    case (IMODEL_GLL_ANISO)
+    write(IMAIN,'(a)',advance='yes') '  gll_aniso'
     case (IMODEL_1D_PREM)
     write(IMAIN,'(a)',advance='yes') '  1d_prem'
     case (IMODEL_1D_CASCADIA)

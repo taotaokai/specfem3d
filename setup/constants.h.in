@@ -547,6 +547,7 @@
   integer, parameter :: IMODEL_IPATI_WATER      = 11
   integer, parameter :: IMODEL_SEP              = 12
   integer, parameter :: IMODEL_COUPLED          = 13
+  integer, parameter :: IMODEL_GLL_ANISO        = 14 !! 2018-04-28 ktao : read in anisotropic models (C_ij)
 
 !!-----------------------------------------------------------
 !!
